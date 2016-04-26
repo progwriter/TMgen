@@ -1,11 +1,12 @@
+# coding: utf-8
+# cython: profile=True
+# filename: mgm.py
 from __future__ import print_function
-import sys
-
-import numpy
-
-sys.path.append("../src/")
-import pyximport
-pyximport.install(setup_args={'include_dirs': [numpy.get_include()]})
 import tmgen
 
-print(tmgen.simple_generator())
+"""
+    Generate a Modulated Gravity traffic matrix
+"""
+
+# 20 nodes, 100 traffic matrices, mean number of flows between nodes is 10000.
+print(tmgen.models.modulated_gravity_tm(20, 100, 10000))
