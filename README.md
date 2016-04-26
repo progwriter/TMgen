@@ -15,6 +15,7 @@ Other, simple models (e.g., uniform, gravity) are also implemented for convenien
 - [x] Modulated Gravity Model (MGM)
 - [ ] Non-stationary Conditionally Independent Model (NCIM)
 - [ ] Spike Model
+
 #### Other models/distributions
 - [x] Gravity Model
 - [x] Uniform
