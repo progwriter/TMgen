@@ -1,2 +1,3 @@
+import models
+import tm
 from tm import TrafficMatrix
-from models import simple_generator
