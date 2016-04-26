@@ -5,20 +5,21 @@ Generation is based on the Max Entropy model described in
 **Spatiotemporal Traffic Matrix Synthesis** by Paul Tune and Matthew Roughan, published in ACM SIGCOMM 2015.
 
 Other, simple models (e.g., uniform, gravity) are also implemented for convenience.
-*This is work in progress*
 
 ## Supported TM models
 
-- Max Entropy Models
-    -[x] Random Gravity Model (RGM)
-    -[x] Modulated Gravity Model (MGM)
-    -[ ] Non-stationary Conditionally Independent Model (NCIM)
-    -[ ] Spike Model
-- Other models/distributions
-    -[x] Gravity Model
-    -[x] Uniform
-    -[ ] Log-normal Model
-    -[ ] Poisson Model
+*This is work in progress*
+
+#### Max Entropy Models
+-[x] Random Gravity Model (RGM)
+-[x] Modulated Gravity Model (MGM)
+-[ ] Non-stationary Conditionally Independent Model (NCIM)
+-[ ] Spike Model
+#### Other models/distributions
+-[x] Gravity Model
+-[x] Uniform
+-[ ] Log-normal Model
+-[ ] Poisson Model
 
 ## Example Usage
 
