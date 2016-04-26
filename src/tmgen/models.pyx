@@ -1,6 +1,7 @@
 from __future__ import division
 
 cimport numpy
+from cpython cimport bool
 from tmgen.hmc cimport hmc_exact
 from tmgen.tm cimport TrafficMatrix
 
@@ -56,7 +57,8 @@ cpdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
 cpdef tuple _modulated_gravity(numpy.ndarray mean_row, numpy.ndarray mean_col,
                                numpy.ndarray modulated_total,
                                double sigmasq,
-                               double sigmasq_temporal=numpy.nan):
+                               double sigmasq_temporal=numpy.nan,
+                               bool only_gravity=False):
     if numpy.isnan(sigmasq_temporal):
         sigmasq_temporal = sigmasq
 
@@ -102,6 +104,8 @@ cpdef tuple _modulated_gravity(numpy.ndarray mean_row, numpy.ndarray mean_col,
     # gravity model
     gravity_model = mean_total * numpy.matmul(numpy.asmatrix(u[:, 1]).T,
                                               *numpy.asmatrix(v[:, 1]))
+    if only_gravity:
+        return gravity_model
 
     # modulate mean with modulated_mean reference total
     cdef numpy.ndarray modulated_mean = \
@@ -176,12 +180,28 @@ cpdef TrafficMatrix modulated_gravity_tm(int num_pops, int num_tms,
     return TrafficMatrix(traffic_matrix)
     # print(traffic_matrix.shape)
 
-cpdef TrafficMatrix gravity_tm(double num_pops, double mean_traffic,
-                               double spatial_variance):
+cpdef TrafficMatrix random_gravity_tm(int num_pops, double mean_traffic,
+                                      double spatial_variance):
     pass
 
-cpdef TrafficMatrix poisson_tm(double num_pops, double mean_traffic):
+cpdef TrafficMatrix gravity_tm():
     pass
 
-cpdef TrafficMatrix lognormal_tm(double num_pops, double mean_traffic):
+cpdef TrafficMatrix poisson_tm(int num_pops, double mean_traffic):
     pass
+
+cpdef TrafficMatrix lognormal_tm(int num_pops, double mean_traffic):
+    pass
+
+cpdef TrafficMatrix uniform_iid(int num_pops, double low, double high):
+    """
+    Return a uniform traffic matrix. Entries are chosen independently.
+
+    :param num_pops: number of points-of-presence
+    :param low:
+    :param high:
+    :return: TrafficMatrix object
+    """
+    cdef numpy.ndarray r = numpy.random.rand(num_pops, num_pops)
+    return TrafficMatrix(numpy.reshape(low + (high-low)*r,
+                                       num_pops, num_pops, 1))
