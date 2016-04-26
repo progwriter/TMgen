@@ -1,32 +1,62 @@
 from __future__ import division
 
-import numpy
 cimport numpy
 from tmgen.hmc cimport hmc_exact
+from tmgen.tm cimport TrafficMatrix
 
-cpdef numpy.ndarray peak_mean_cycle(double freq, double n, double mean, double peak_to_mean,
-                                    double trough_to_mean=numpy.nan):
+cpdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
+                                     double peak_to_mean,
+                                     double trough_to_mean=numpy.nan):
+    """
+    Generate a simple sinusoid with specified frequency, length, mean,
+    peak-to-mean ratio, and trough_to_mean ratio.
+
+    The generated signal has the form
+    $x = mean*(peaktomean-1)*sin(2*\pi*freq*linspace(0,1,N))+mean$
+
+    Note that if the mean m is 0, then
+    $x = peakmean*sin(2*\pi*freq*linspace(0,1,N))$
+
+    Intervals of x below the mean have a drawdown determined by troughmean.
+
+    ..note
+        the trough-to-mean ratio must be less than or equal to the
+        peak-to-mean ratio.
+
+    :param freq: frequency
+    :param n: number of samples
+    :param mean: mean value
+    :param peak_to_mean: ratio of peak to mean. Must be >= 1 (1 resulting
+        in a constant, flatlined signal)
+    :param trough_to_mean: ratio of through to mean
+    :return: 
+    """
     if peak_to_mean < 1:
-        raise ValueError('Peak-to-mean ratio must be greater than or equal to 1')
+        raise ValueError(
+            'Peak-to-mean ratio must be greater than or equal to 1')
+    cdef numpy.ndarray base = numpy.sin(
+        2 * numpy.pi * freq * numpy.linspace(0, n - 1, n))
     if mean == 0:
-        return peak_to_mean * numpy.sin(2 * numpy.pi * freq * numpy.linspace(0, n - 1, n))
+        return peak_to_mean * base
     cdef numpy.ndarray x, y
-    cdef numpy.ndarray base = numpy.sin(2 * numpy.pi * freq * numpy.linspace(0, n - 1, n))
+    cdef int i
     x = mean * (peak_to_mean - 1) * base + mean
-    # FIXME: implement trough to mean
     if not numpy.isnan(trough_to_mean):
-        raise NotImplementedError('Through-to-mean ratio has not been implemented yet')
-        # if troughToMeanRatio > peakToMeanRatio:
-        #     raise ValueError('Trough-to-mean ratio must be less than or equal to peak-to-mean ratio')
-        # if troughToMeanRatio == 1:
-        #     return x  # no effect on trough
-        # y = mean * (troughToMeanRatio - 1) * base + mean
-        # # print('PMC:', x, y)
-        # x[x < mean] = y[y < mean]
+        if trough_to_mean > peak_to_mean:
+            raise ValueError(
+                'Trough-to-mean ratio must be less than or equal to peak-to-mean ratio')
+        if trough_to_mean == 1:
+            return x  # no effect on trough
+        y = mean * (trough_to_mean - 1) * base + mean
+        for i in numpy.arange(x.size):
+            if x[i] < mean and y[i] < mean:
+                x[i] = y[i]
     return x
 
-cpdef tuple modulated_gravity(numpy.ndarray mean_row, numpy.ndarray mean_col, numpy.ndarray modulated_total,
-                              double sigmasq, double sigmasq_temporal=numpy.nan):
+cpdef tuple _modulated_gravity(numpy.ndarray mean_row, numpy.ndarray mean_col,
+                               numpy.ndarray modulated_total,
+                               double sigmasq,
+                               double sigmasq_temporal=numpy.nan):
     if numpy.isnan(sigmasq_temporal):
         sigmasq_temporal = sigmasq
 
@@ -59,45 +89,65 @@ cpdef tuple modulated_gravity(numpy.ndarray mean_row, numpy.ndarray mean_col, nu
     # generate truncated normal random variables: we generate two samples
     # each time because hmc_exact needs to burn-in
     cdef numpy.ndarray u = hmc_exact(numpy.eye(num_pops), numpy.zeros(num_pops),
-                                     numpy.eye(num_pops) * sigmasq / mean_total ** 2, pu, True, 2, pu)
+                                     numpy.eye(
+                                         num_pops) * sigmasq / mean_total ** 2,
+                                     pu, True, 2, pu)
     cdef numpy.ndarray v = hmc_exact(numpy.eye(num_pops), numpy.zeros(num_pops),
-                                     numpy.eye(num_pops) * sigmasq / mean_total ** 2, pv, True, 2, pv)
+                                     numpy.eye(
+                                         num_pops) * sigmasq / mean_total ** 2,
+                                     pv, True, 2, pv)
     # print(u, v)
     cdef numpy.ndarray normalized_mean = modulated_total / mean_total
 
-    # modulate mean with modulated_mean reference total
-    cdef numpy.ndarray modulated_mean = hmc_exact(numpy.eye(num_tms), numpy.zeros(num_tms),
-                                                  numpy.eye(num_tms) * sigmasq_temporal / mean_total ** 2,
-                                                  normalized_mean.T,
-                                                  True, 2, normalized_mean.T)
-
     # gravity model
-    gravity_model = mean_total * numpy.matmul(numpy.asmatrix(u[:,1]).T, * numpy.asmatrix(v[:,1]))
-    # print(gravity_model.shape[0], gravity_model.shape[1])
+    gravity_model = mean_total * numpy.matmul(numpy.asmatrix(u[:, 1]).T,
+                                              *numpy.asmatrix(v[:, 1]))
+
+    # modulate mean with modulated_mean reference total
+    cdef numpy.ndarray modulated_mean = \
+        hmc_exact(numpy.eye(num_tms),
+                  numpy.zeros(num_tms),
+                  numpy.eye(num_tms) * sigmasq_temporal / mean_total ** 2,
+                  normalized_mean.T,
+                  True, 2, normalized_mean.T)
 
     # construct modulated_mean gravity model
     # in 3D array form
-    cdef numpy.ndarray traffic_matrix = numpy.matmul(numpy.reshape(gravity_model, (num_pops ** 2, 1)),
-                                                     numpy.asmatrix(modulated_mean[:, 1]))
+    cdef numpy.ndarray traffic_matrix = numpy.matmul(
+        numpy.reshape(gravity_model, (num_pops ** 2, 1)),
+        numpy.asmatrix(modulated_mean[:, 1]))
     # print(traffic_matrix.shape[0], traffic_matrix.shape[1])
-    traffic_matrix = numpy.reshape(numpy.asarray(traffic_matrix), (num_pops, num_pops, num_tms))
+    traffic_matrix = numpy.reshape(numpy.asarray(traffic_matrix),
+                                   (num_pops, num_pops, num_tms))
     return traffic_matrix, gravity_model
 
-cpdef simple_generator():
-    cdef int num_pops = 20  # number of PoPs
-    cdef int day = 96
-    cdef int num_days = 7  # set number of days
-    # cdef int num_tms = num_days * day  # number of traffic matrices
-    cdef int num_tms = 50
-    cdef double mean_traffic = 100  # average total traffic
-    cdef double pm_ratio = 2  # peak-to-mean ratio
-    cdef double t_ratio = 0.25 * pm_ratio  # trough-to-mean ratio
-    cdef double diurnal_freq = 1 / 96
-    cdef double spatial_var = 100  # \sigma^2 parameter variation of traffic
-    cdef double temporal_var = 0.01
+cpdef TrafficMatrix modulated_gravity_tm(int num_pops, int num_tms,
+                                         double mean_traffic,
+                                         double pm_ratio=2, double t_ratio=.5,
+                                         double diurnal_freq=1 / 24,
+                                         double spatial_variance=100,
+                                         double temporal_variance=0.01):
+    """
+    Generate a modulated gravity traffic matrix with the given parameters
+
+    :param num_pops: number of Points-of-Presence (i.e., origin-destination pairs)
+    :param num_tms: total number of traffic matrices to generate (i.e., time epochs)
+    :param mean_traffic: the average total volume of traffic
+    :param pm_ratio: peak-to-mean ratio. Peak traffic will be larger by
+        this much (must be bigger than 1)
+    :param t_ratio: trough-to-mean ratio. Default is 0.5
+    :param diurnal_freq: Frequency of modulation. Default is 1/24 (i.e., hourly) if you are generating multi-day TMs
+    :param spatial_variance: Variance on the volume of traffic between
+        origin-destination pairs.
+        Pick someting reasonable with respect to your mean_traffic. Default is 100
+    :param temporal_variance: Variance on the volume in time
+    :return:
+    """
 
     # generate total traffic
-    cdef numpy.ndarray total_traffic = peak_mean_cycle(diurnal_freq, num_tms, mean_traffic, pm_ratio)
+    cdef numpy.ndarray total_traffic = _peak_mean_cycle(diurnal_freq, num_tms,
+                                                        mean_traffic, pm_ratio,
+                                                        t_ratio)
     if numpy.min(total_traffic) < 0:
         # rescale
         total_traffic = total_traffic + numpy.absolute(numpy.min(total_traffic))
@@ -115,10 +165,23 @@ cpdef simple_generator():
     # print ('mean_row', mean_row)
 
     # incoming
-    fraction = numpy.random.rand(num_pops)
+    # fraction = numpy.random.rand(num_pops)
     fraction = fraction / (numpy.sum(fraction))
     mean_col = fraction * mean_traffic
 
     # note: rank of G must be 1
-    (traffic_matrix, g) = modulated_gravity(mean_row, mean_col, total_traffic, spatial_var, temporal_var)
-    print(traffic_matrix.shape)
+    (traffic_matrix, g) = _modulated_gravity(mean_row, mean_col, total_traffic,
+                                             spatial_variance,
+                                             temporal_variance)
+    return TrafficMatrix(traffic_matrix)
+    # print(traffic_matrix.shape)
+
+cpdef TrafficMatrix gravity_tm(double num_pops, double mean_traffic,
+                               double spatial_variance):
+    pass
+
+cpdef TrafficMatrix poisson_tm(double num_pops, double mean_traffic):
+    pass
+
+cpdef TrafficMatrix lognormal_tm(double num_pops, double mean_traffic):
+    pass
