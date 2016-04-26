@@ -11,15 +11,15 @@ Other, simple models (e.g., uniform, gravity) are also implemented for convenien
 *This is work in progress*
 
 #### Max Entropy Models
--[x] Random Gravity Model (RGM)
--[x] Modulated Gravity Model (MGM)
--[ ] Non-stationary Conditionally Independent Model (NCIM)
--[ ] Spike Model
+- [x] Random Gravity Model (RGM)
+- [x] Modulated Gravity Model (MGM)
+- [ ] Non-stationary Conditionally Independent Model (NCIM)
+- [ ] Spike Model
 #### Other models/distributions
--[x] Gravity Model
--[x] Uniform
--[ ] Log-normal Model
--[ ] Poisson Model
+- [x] Gravity Model
+- [x] Uniform
+- [ ] Log-normal Model
+- [ ] Poisson Model
 
 ## Example Usage
 
