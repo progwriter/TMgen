@@ -1,3 +1,4 @@
+# coding=utf-8
 import numpy
 cimport numpy
 from cpython cimport bool

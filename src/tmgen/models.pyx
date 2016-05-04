@@ -1,9 +1,13 @@
+# coding=utf-8
 from __future__ import division
 
+import numpy
 cimport numpy
+
 from cpython cimport bool
 from tmgen.hmc cimport hmc_exact
 from tmgen.tm cimport TrafficMatrix
+from six.moves import range
 
 cpdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
                                      double peak_to_mean,
@@ -184,14 +188,33 @@ cpdef TrafficMatrix random_gravity_tm(int num_pops, double mean_traffic,
                                       double spatial_variance):
     pass
 
-cpdef TrafficMatrix gravity_tm():
-    pass
+cpdef TrafficMatrix gravity_tm(int num_pops, numpy.ndarray populations,
+                               double total_traffic):
+    """
+    Compute the gravity traffic matrix
+    :param num_pops: number of poins of presence
+    :param populations: array with populations (weights) for each PoP
+    :param total_traffic: total amount of traffic in the network
+    :return: TraffixMatrix object
+    """
+    assert populations.ndim == 1
+    res = numpy.zeros((num_pops, num_pops))
+    cdef double denom = numpy.sum(populations) ** 2
+    cdef int i, j = 0
+    for i in range(num_pops):
+        for j in range(num_pops):
+            res[i,j] = populations[i]*populations[j]/denom * total_traffic
+    # Conform to the 3d shape
+    res = numpy.reshape(res, (num_pops, num_pops, 1))
+    return TrafficMatrix(res)
 
-cpdef TrafficMatrix poisson_tm(int num_pops, double mean_traffic):
-    pass
 
-cpdef TrafficMatrix lognormal_tm(int num_pops, double mean_traffic):
-    pass
+# cpdef TrafficMatrix poisson_tm(int num_pops, double mean_traffic):
+#     return mean_traffic * numpy.random.poisson(size=(num_pops, num_pops, 1))
+#
+# cpdef TrafficMatrix lognormal_tm(int num_pops, double sigma,
+#                                  double mean_traffic):
+#     return mean_traffic * numpy.random.log_normal(size=(num_pops, num_pops, 1))
 
 cpdef TrafficMatrix uniform_iid(int num_pops, double low, double high):
     """
@@ -205,3 +228,7 @@ cpdef TrafficMatrix uniform_iid(int num_pops, double low, double high):
     cdef numpy.ndarray r = numpy.random.rand(num_pops, num_pops)
     return TrafficMatrix(numpy.reshape(low + (high-low)*r,
                                        num_pops, num_pops, 1))
+
+cpdef TrafficMatrix exp_tm(int num_pops, double mean_traffic):
+    return numpy.random.exponential(1/mean_traffic,
+                                    size=(num_pops, num_pops, 1))
