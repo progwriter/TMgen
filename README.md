@@ -35,6 +35,8 @@ functions. Internally it contains a 3-d numpy array which contains volume of
 traffic between origin-destination pairs for different time epochs. For TM models
 that do not have a time component, the third dimension is of size 1.
 
+**More on model generation coming soon**
+
 ## Big Thanks
 To Paul Tune, Matthew Roughan, and Ari Pakman for their work in this space and
 for making their code available. This code is an adaptation of their Matlab
