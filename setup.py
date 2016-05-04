@@ -16,7 +16,7 @@ setup(
     package_dir={'': 'src'},
     packages=['tmgen'],
     url='https://github.com/progwriter/tmgen',
-    requires=['numpy', 'cython'],
+    requires=['numpy', 'cython', 'six', 'tmgen'],
     include_dirs=[numpy.get_include()],
     ext_modules=cythonize("src/tmgen/**/*.pyx")
 )
