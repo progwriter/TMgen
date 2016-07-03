@@ -12,8 +12,10 @@ cdef numpy.ndarray mrdivide(numpy.ndarray a, numpy.ndarray b):
     return numpy.linalg.solve(a.T, b.T).T
 
 # TODO: implement cov=False
-cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g, numpy.ndarray constraint_m, numpy.ndarray mu_r,
-                             bool covariance, int num_samples, numpy.ndarray initial_x):
+cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
+                             numpy.ndarray constraint_m, numpy.ndarray mu_r,
+                             bool covariance, int num_samples,
+                             numpy.ndarray initial_x):
     cdef int m = g.shape[0]
     if not f.shape[0] == m:
         raise ValueError('First dimension of f and g must match')
@@ -27,7 +29,8 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g, numpy.ndarray con
         initial_x = initial_x - mu
         initial_x = mldivide(r.T, initial_x)
     else:
-        raise NotImplementedError("Non-covariance constraints are not yet implemented")
+        raise NotImplementedError(
+            "Non-covariance constraints are not yet implemented")
         # mu = numpy.linalg.solve(r, numpy.linalg.solve(r.T, mu_r))
         # g = g + numpy.matmul(f, mu)
         # f = numpy.matmul(r, numpy.linalg.inverse(f))
@@ -51,7 +54,7 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g, numpy.ndarray con
     cdef numpy.ndarray last_x = initial_x
     result_xs = numpy.zeros((d, num_samples))
     # print(result_xs.shape)
-    result_xs[:,0] = initial_x
+    result_xs[:, 0] = initial_x
 
     cdef int i = 1
     cdef int stop, j, indj, m_ind = 0
@@ -86,7 +89,8 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g, numpy.ndarray con
                 inds = numpy.where(div_result <= 1)[0]
                 # print(inds)
                 phn = phi[pn]
-                t1 = -phn + numpy.arccos(-g[pn] / u[pn])  # time at which coordinates hit the walls
+                t1 = -phn + numpy.arccos(
+                    -g[pn] / u[pn])  # time at which coordinates hit the walls
                 # this expression always gives the correct result because U*cos(phi + t) + g >= 0.
 
 
@@ -95,10 +99,13 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g, numpy.ndarray con
                 # make sure that a new reflection at j is not found because of numerical error
                 if j > 0:
                     if pn[j]:
-                        cs = numpy.cumsum(numpy.where(div_result <= 1, div_result, numpy.zeros(div_result.size)))
+                        cs = numpy.cumsum(
+                            numpy.where(div_result <= 1, div_result,
+                                        numpy.zeros(div_result.size)))
                         indj = cs[j]
                         tt1 = t1[indj]
-                        if numpy.absolute(tt1) < near_zero or numpy.absolute(tt1 - 2 * numpy.pi) < near_zero:
+                        if numpy.absolute(tt1) < near_zero or numpy.absolute(
+                                        tt1 - 2 * numpy.pi) < near_zero:
                             t1[indj] = numpy.inf
 
                 m_ind = numpy.argmin(t1)
@@ -133,7 +140,7 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g, numpy.ndarray con
         # constraints before accepting it.
 
         if numpy.all(numpy.matmul(f, x) + g > 0):
-            result_xs[:,i] = x
+            result_xs[:, i] = x
             last_x = x
             i += 1
         else:
