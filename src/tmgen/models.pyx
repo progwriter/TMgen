@@ -1,17 +1,17 @@
 # coding=utf-8
 from __future__ import division
 
-import numpy
 cimport numpy
+import numpy
 
 from cpython cimport bool
 from tmgen.hmc cimport hmc_exact
 from tmgen.tm cimport TrafficMatrix
 from six.moves import range
 
-cpdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
-                                     double peak_to_mean,
-                                     double trough_to_mean=numpy.nan):
+cdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
+                                    double peak_to_mean,
+                                    double trough_to_mean=numpy.nan):
     """
     Generate a simple sinusoid with specified frequency, length, mean,
     peak-to-mean ratio, and trough_to_mean ratio.
@@ -58,11 +58,11 @@ cpdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
                 x[i] = y[i]
     return x
 
-cpdef tuple _modulated_gravity(numpy.ndarray mean_row, numpy.ndarray mean_col,
-                               numpy.ndarray modulated_total,
-                               double sigmasq,
-                               double sigmasq_temporal=numpy.nan,
-                               bool only_gravity=False):
+cdef tuple _modulated_gravity(numpy.ndarray mean_row, numpy.ndarray mean_col,
+                              numpy.ndarray modulated_total,
+                              double sigmasq,
+                              double sigmasq_temporal=numpy.nan,
+                              bool only_gravity=False):
     if numpy.isnan(sigmasq_temporal):
         sigmasq_temporal = sigmasq
 
@@ -203,11 +203,10 @@ cpdef TrafficMatrix gravity_tm(int num_pops, numpy.ndarray populations,
     cdef int i, j = 0
     for i in range(num_pops):
         for j in range(num_pops):
-            res[i,j] = populations[i]*populations[j]/denom * total_traffic
+            res[i, j] = populations[i] * populations[j] / denom * total_traffic
     # Conform to the 3d shape
     res = numpy.reshape(res, (num_pops, num_pops, 1))
     return TrafficMatrix(res)
-
 
 # cpdef TrafficMatrix poisson_tm(int num_pops, double mean_traffic):
 #     return mean_traffic * numpy.random.poisson(size=(num_pops, num_pops, 1))
@@ -216,19 +215,58 @@ cpdef TrafficMatrix gravity_tm(int num_pops, numpy.ndarray populations,
 #                                  double mean_traffic):
 #     return mean_traffic * numpy.random.log_normal(size=(num_pops, num_pops, 1))
 
-cpdef TrafficMatrix uniform_iid(int num_pops, double low, double high):
+cpdef TrafficMatrix uniform_iid(int num_pops, double low, double high,
+                                int num_epochs=1):
     """
-    Return a uniform traffic matrix. Entries are chosen independently.
+    Return a uniform traffic matrix. Entries are chosen independently from each other,
+    uniformly at random, between given values of low and high.
 
     :param num_pops: number of points-of-presence
-    :param low:
-    :param high:
+    :param low: lowest tm value
+    :param high: highest tm value
+    :param num_epochs: number of
     :return: TrafficMatrix object
     """
-    cdef numpy.ndarray r = numpy.random.rand(num_pops, num_pops)
-    return TrafficMatrix(numpy.reshape(low + (high-low)*r,
-                                       num_pops, num_pops, 1))
+    if num_pops < 0 or low < 0 or high < 0:
+        raise ValueError("All values must be greater than 0")
+    if low >= high:
+        low, high = high, low  #  swap
+    # Get random tm
+    cdef numpy.ndarray r = numpy.random.rand((num_pops, num_pops, num_epochs))
+    return TrafficMatrix(numpy.reshape(low + (high - low) * r,
+                                       num_pops, num_pops, 1).clip(min=0))
 
-cpdef TrafficMatrix exp_tm(int num_pops, double mean_traffic):
-    return numpy.random.exponential(1/mean_traffic,
-                                    size=(num_pops, num_pops, 1))
+cpdef TrafficMatrix exp_tm(int num_pops, double mean_traffic, int num_epochs=1):
+    return numpy.random.exponential(mean_traffic,
+                                    size=(num_pops, num_pops, num_epochs)) \
+        .clip(min=0)
+
+cpdef TrafficMatrix spike_tm(int num_pops, int num_spikes, double mean_spike,
+                             int num_epochs=1):
+    """
+    Generate a traffic matrix using the spike model.
+    :param num_pops: number of nodes in the network
+    :param num_spikes: number of ingress-egress spikes. Must be fewer than $num_pops^2$
+    :param mean_spike: average volume of a single spike
+    :param num_epochs: number of time epochs
+    :return:
+    """
+    if not num_spikes < num_pops * num_pops:
+        raise ValueError('Number of spikes cannot be larger than number of '
+                         'ingress-egress pairs')
+    tm = numpy.random.exponential(mean_spike,
+                                  size=(num_pops, num_pops, num_epochs))
+
+    # This generates a "mask" for which values to zero out. We need all values
+    # except num_spikes to be 0s. So we generete an 1-d array of num_spikes ones
+    # and all other zeros.
+    # We continue to shuffle it, and reshape it into a 2-d array of n x n nodes
+    # to use it as a boolean index into the traffic matrix and set values to 0.
+    mask = numpy.concatenate((numpy.ones(num_spikes),
+                              numpy.zeros(num_pops * num_pops - num_spikes)))
+    for e in range(num_epochs):
+        numpy.random.shuffle(mask)
+        reshaped_mask = mask.reshape((num_pops, num_pops))
+        tm[:, :, e][reshaped_mask == 0] = 0
+
+    return TrafficMatrix(tm)
