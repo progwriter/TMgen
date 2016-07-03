@@ -3,6 +3,9 @@ import numpy
 cimport numpy
 
 cdef class TrafficMatrix:
+    """
+        Spatio-temporal traffix matrix object
+    """
     cdef public numpy.ndarray matrix
     cpdef numpy.ndarray at_time(self, int t)
     cpdef between(self, int o, int d, str modestr=*)

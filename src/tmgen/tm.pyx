@@ -1,12 +1,12 @@
 # coding=utf-8
-import numpy
 cimport numpy
-from six.moves import cPickle
+from six.moves import cPickle # for py 2/3 compat
 
 ctypedef enum EntryMode:
     ALL, MIN, MAX, MEAN
 
 cdef EntryMode _mode_to_enum(str m):
+    # Convert the string to enum
     m = m.lower()
     if m == 'all' or m == '*':
         return ALL
@@ -33,8 +33,13 @@ cdef class TrafficMatrix:
         :return:
         """
         self.matrix = tm
-        assert tm.shape[0] == tm.shape[1]  # num_pops both ways
-        assert tm.ndim == 3  # 2d + time
+        if not tm.ndim == 3:  # 2d + time
+            raise ValueError('Traffic matrix must have 3 dimensions: n x n x m,'
+                             'where n is number of nodes and m is number of '
+                             'epochs (at least 1)')
+        if not tm.shape[0] == tm.shape[1]:  # num_pops both ways
+            raise ValueError('Traffic matrix dimensions must match')
+
 
     cpdef numpy.ndarray at_time(self, int t):
         """
@@ -45,6 +50,14 @@ cdef class TrafficMatrix:
         return self.matrix[:, :, t]
 
     cpdef between(self, int o, int d, str modestr='all'):
+        """
+        Return the traffic matrix between the given ingress and egress nodes.
+        This method supports multiple temporal modes: 'all', 'min', 'max', and 'mean'
+        :param o:
+        :param d:
+        :param modestr:
+        :return: numpy ndarray if modestr=='all', double otherwise
+        """
         mode = _mode_to_enum(modestr)
         if mode == ALL:
             return self.matrix[o, d, :]
@@ -57,7 +70,7 @@ cdef class TrafficMatrix:
 
     cpdef to_pickle(self, fname):
         """
-        Save to a python pickle file
+        Save the matrix to a python pickle file
         :param fname: the file name
         """
         with open(fname, 'w') as f:
@@ -82,7 +95,7 @@ cdef class TrafficMatrix:
         return self.matrix.shape[2]
 
     @staticmethod
-    def from_pickle(fname):
+    def from_pickle(str fname):
         """
         Load a TrafficMatrix object from a file
         :param fname: the file name on disk
@@ -93,3 +106,9 @@ cdef class TrafficMatrix:
 
     def __repr__(self):
         return repr(self.matrix)
+
+    def __len__(self):
+        return self.num_epochs()
+
+    def __add__(self, other):
+        return TrafficMatrix(self.matrix + other.matrix)
