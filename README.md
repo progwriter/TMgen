@@ -23,9 +23,8 @@ convenience.
 
 ## Installation
 
-Run ``python setup.py install`` **or** ``pip install .``
-Note that TMgen requires you have cython and numpy installed.
-
+1. Install numpy and cython. (For example using `pip install numpy cython`)
+2. Run ``pip install .``
 
 ## Example Usage
 

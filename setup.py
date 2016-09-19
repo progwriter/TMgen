@@ -1,14 +1,19 @@
 # coding=utf-8
 
-
 from distutils.core import setup
+# from setuptools import setup
+# from setuptools.extension import Extension
 
-import numpy
-from Cython.Build import cythonize
+try:
+    import numpy
+    from Cython.Build import cythonize
+except ImportError as e:
+    print ('TMgen requires numpy and cython to be installed!')
+    raise e
 
 setup(
     name='tmgen',
-    version='0.1',
+    version='0.1.1',
 
     author='Victor Heorhiadi',
     author_email='victor@cs.unc.edu',
@@ -22,5 +27,4 @@ setup(
     package_data={
         'tmgen': ['*.pxd'],
     }
-
 )
