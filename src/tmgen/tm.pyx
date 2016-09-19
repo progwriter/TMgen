@@ -1,4 +1,6 @@
 # coding=utf-8
+
+import numpy
 cimport numpy
 from six.moves import cPickle # for py 2/3 compat
 
@@ -75,6 +77,15 @@ cdef class TrafficMatrix:
         """
         with open(fname, 'w') as f:
             cPickle.dump(self.matrix, f)
+
+    cpdef TrafficMatrix mean(self):
+        """
+        Returns a new traffic matrix that is the mean across all epochs.
+        :return:
+        """
+        return TrafficMatrix(numpy.reshape(self.matrix.max(axis=2),
+                                           (self.num_pops(), self.num_pops(),
+                                           1)))
 
     cpdef TrafficMatrix worst_case(self):
         """

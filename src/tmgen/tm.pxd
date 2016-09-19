@@ -11,5 +11,6 @@ cdef class TrafficMatrix:
     cpdef between(self, int o, int d, str modestr=*)
     cpdef to_pickle(self, fname)
     cpdef TrafficMatrix worst_case(self)
+    cpdef TrafficMatrix mean(self)
     cpdef int num_pops(self)
     cpdef int num_epochs(self)
