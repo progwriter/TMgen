@@ -20,6 +20,7 @@ setup(
     include_dirs=[numpy.get_include()],
     ext_modules=cythonize("src/tmgen/**/*.pyx"),
     package_data={
-        'tmgen': ['src/tmgen/*.pxd'],
+        'tmgen': ['*.pxd'],
     }
+
 )

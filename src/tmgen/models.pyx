@@ -275,3 +275,7 @@ cpdef TrafficMatrix spike_tm(int num_pops, int num_spikes, double mean_spike,
         tm[:, :, e][reshaped_mask == 0] = 0
 
     return TrafficMatrix(tm)
+
+
+__all__ = ['modulated_gravity_tm', 'random_gravity_tm', 'gravity_tm',
+           'uniform_iid', 'exp_tm', 'spike_tm']
