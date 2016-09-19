@@ -36,9 +36,11 @@ cdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
     :param trough_to_mean: ratio of through to mean
     :return: 
     """
+    # sanity checks
     if peak_to_mean < 1:
         raise ValueError(
             'Peak-to-mean ratio must be greater than or equal to 1')
+    # Generate the basic sinusoid
     cdef numpy.ndarray base = numpy.sin(
         2 * numpy.pi * freq * numpy.linspace(0, n - 1, n))
     if mean == 0:
@@ -131,7 +133,7 @@ cdef tuple _modulated_gravity(numpy.ndarray mean_row, numpy.ndarray mean_col,
 
 cpdef TrafficMatrix modulated_gravity_tm(int num_pops, int num_tms,
                                          double mean_traffic,
-                                         double pm_ratio=2, double t_ratio=.5,
+                                         double pm_ratio=1.5, double t_ratio=.75,
                                          double diurnal_freq=1 / 24,
                                          double spatial_variance=100,
                                          double temporal_variance=0.01):
@@ -142,8 +144,8 @@ cpdef TrafficMatrix modulated_gravity_tm(int num_pops, int num_tms,
     :param num_tms: total number of traffic matrices to generate (i.e., time epochs)
     :param mean_traffic: the average total volume of traffic
     :param pm_ratio: peak-to-mean ratio. Peak traffic will be larger by
-        this much (must be bigger than 1)
-    :param t_ratio: trough-to-mean ratio. Default is 0.5
+        this much (must be bigger than 1). Default is 1.5
+    :param t_ratio: trough-to-mean ratio. Default is 0.75
     :param diurnal_freq: Frequency of modulation. Default is 1/24 (i.e., hourly) if you are generating multi-day TMs
     :param spatial_variance: Variance on the volume of traffic between
         origin-destination pairs.
@@ -232,14 +234,15 @@ cpdef TrafficMatrix uniform_iid(int num_pops, double low, double high,
     if low >= high:
         low, high = high, low  #  swap
     # Get random tm
-    cdef numpy.ndarray r = numpy.random.rand((num_pops, num_pops, num_epochs))
+    cdef numpy.ndarray r = numpy.random.rand(num_pops, num_pops, num_epochs)
     return TrafficMatrix(numpy.reshape(low + (high - low) * r,
-                                       num_pops, num_pops, 1).clip(min=0))
+                                       (num_pops, num_pops, 1)).clip(min=0))
 
 cpdef TrafficMatrix exp_tm(int num_pops, double mean_traffic, int num_epochs=1):
-    return numpy.random.exponential(mean_traffic,
-                                    size=(num_pops, num_pops, num_epochs)) \
-        .clip(min=0)
+    return \
+        TrafficMatrix(numpy.random.exponential(mean_traffic,
+                                               size=(num_pops, num_pops,
+                                                     num_epochs)).clip(min=0))
 
 cpdef TrafficMatrix spike_tm(int num_pops, int num_spikes, double mean_spike,
                              int num_epochs=1):
@@ -254,8 +257,10 @@ cpdef TrafficMatrix spike_tm(int num_pops, int num_spikes, double mean_spike,
     if not num_spikes < num_pops * num_pops:
         raise ValueError('Number of spikes cannot be larger than number of '
                          'ingress-egress pairs')
+    # Start by generating a non-negative exponential matrix
     tm = numpy.random.exponential(mean_spike,
-                                  size=(num_pops, num_pops, num_epochs))
+                                  size=(num_pops, num_pops, num_epochs)) \
+        .clip(min=0)
 
     # This generates a "mask" for which values to zero out. We need all values
     # except num_spikes to be 0s. So we generete an 1-d array of num_spikes ones
