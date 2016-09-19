@@ -12,13 +12,10 @@ convenience.
 
 *This is work in progress*
 
-#### Max Entropy Models
-- [x] Random Gravity Model (RGM)
-- [x] Modulated Gravity Model (MGM)
-- [ ] Non-stationary Conditionally Independent Model (NCIM)
-- [ ] Spike Model
-
-#### Other models/distributions
+- [x] Random Gravity Model
+- [x] Modulated Gravity Model
+- [ ] Non-stationary Conditionally Independent Model
+- [x] Spike Model
 - [x] Gravity Model
 - [x] Uniform
 - [ ] Log-normal Model
@@ -26,7 +23,9 @@ convenience.
 
 ## Installation
 
-Run ``python setup.py install``
+Run ``python setup.py install`` **or** ``pip install .``
+Note that TMgen requires you have cython and numpy installed.
+
 
 ## Example Usage
 
