@@ -1,6 +1,7 @@
 # coding=utf-8
 
 from distutils.core import setup
+
 # from setuptools import setup
 # from setuptools.extension import Extension
 
@@ -23,7 +24,8 @@ setup(
     url='https://github.com/progwriter/tmgen',
     requires=['numpy', 'cython', 'six'],
     include_dirs=[numpy.get_include()],
-    ext_modules=cythonize("src/tmgen/**/*.pyx"),
+    ext_modules=cythonize("src/tmgen/**/*.pyx", compiler_directives={
+        'embedsignature': True}),
     package_data={
         'tmgen': ['*.pxd'],
     }
