@@ -7,6 +7,7 @@ Download and installation
 -------------------------
 
 Since tmgen in still under developmnet please install from the github repository
+
 1. Clone ::
 
     git clone https://github.com/progwriter/tmgen
@@ -14,7 +15,7 @@ Since tmgen in still under developmnet please install from the github repository
 2. Install using pip ::
 
     cd tmgen
-    pip install -e .
+    pip install .
 
 Example usage
 -------------

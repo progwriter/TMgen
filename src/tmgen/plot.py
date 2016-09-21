@@ -1,8 +1,13 @@
-import seaborn
+try:
+    import seaborn
+    seaborn.set(style='white')
+except ImportError:
+    import warnings
+    warnings.warn('Consider installing searbon package for prettier graphs',
+                  category=ImportError)
 from matplotlib import pyplot as plt
 from six.moves import range
 
-seaborn.set(style='white')
 
 
 def heatmap(tm, epoch=None):
@@ -14,9 +19,12 @@ def heatmap(tm, epoch=None):
     If tm has multiple epochs, the graph will have ingress-egress pairs
     enumerated sequentially on the y-axis and epochs on x-axis.
 
+    :param tm: the traffic matrix to visualize
+    :param epoch: the epoch to plot. If None, all epochs will be plotted
+
     .. note::
 
-        This uses the matplotlib.pyplot for graphing. It is the users
+        This uses the matplotlib.pyplot for graphing. It is the user's
         responsibility to create new figures and display (or save) the plot
 
     Example: ::
@@ -29,10 +37,6 @@ def heatmap(tm, epoch=None):
         tm = tmgen.exp_tm(10, 500) # 10 nodes, mean of 500 flows per IE
         tmgen.plot.heatmap(tm)
         plt.show()  # display the graph interactively
-
-    :param tm: the traffic matrix to visualize
-    :param epoch: the epoch to plot. If None, all epochs will be plotted
-    :returns:
     """
     n = tm.num_pops()
     reshaped = False
@@ -59,8 +63,27 @@ def heatmap(tm, epoch=None):
 
 def timeseries(tm):
     """
+    Plot the traffic matrix as timeseries. With epochs on the x-axis and volume
+    of the y-axis each line represents a single OD pair.
 
-    :param tm:
+    :param tm: the traffic matrix to visualize
+
+    .. note::
+
+        This uses the matplotlib.pyplot for graphing. It is the user's
+        responsibility to create new figures and display (or save) the plot
+
+    Example: ::
+
+        import tmgen
+        from matplotlib import pyplot as plt
+        from tmgen.plot import heatmap
+
+        plt.figure()
+        tm = tmgen.exp_tm(10, 500) # 10 nodes, mean of 500 flows per IE
+        tmgen.plot.timeseries(tm)
+        plt.show()  # display the graph interactively
+
     """
     n = tm.num_pops()
     for i in range(n):

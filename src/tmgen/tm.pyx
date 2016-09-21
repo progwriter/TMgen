@@ -28,11 +28,11 @@ cdef class TrafficMatrix:
     def __init__(self, numpy.ndarray tm):
         """
         Create a new traffic matrix from the given array
+
         :param tm: the Numpy ndarray. Must have three dimetions, n x n x m.
             If the matrix has no variability in time, them m=1
             First two dimensions must match, as a single traffic matrix is
             always n x n.
-        :return:
         """
         self.matrix = tm
         if not tm.ndim == 3:  # 2d + time
@@ -45,20 +45,23 @@ cdef class TrafficMatrix:
 
     cpdef numpy.ndarray at_time(self, int t):
         """
-        Return a numpy ndarray reprenseting a single TM at epoch t.
+        Return a numpy array reprenseting a single TM at epoch t.
+
         :param t: the number of the epoch (0-indexed).
-        :return: numpy ndarray
+        :rtype: numpy array
         """
         return self.matrix[:, :, t]
 
-    cpdef between(self, int o, int d, str modestr='all'):
+    cpdef between(self, int o, int d, modestr='all'):
         """
         Return the traffic matrix between the given ingress and egress nodes.
-        This method supports multiple temporal modes: 'all', 'min', 'max', and 'mean'
-        :param o:
-        :param d:
-        :param modestr:
-        :return: numpy ndarray if modestr=='all', double otherwise
+        This method supports multiple temporal modes: 'all', 'min', 'max', and
+        'mean'
+
+        :param o: source node (origin)
+        :param d: destination node
+        :param modestr: temporal mode
+        :return: Numpy array if modestr=='all', double otherwise
         """
         mode = _mode_to_enum(modestr)
         if mode == ALL:
@@ -73,6 +76,7 @@ cdef class TrafficMatrix:
     cpdef to_pickle(self, fname):
         """
         Save the matrix to a python pickle file
+
         :param fname: the file name
         """
         with open(fname, 'w') as f:
@@ -80,8 +84,8 @@ cdef class TrafficMatrix:
 
     cpdef TrafficMatrix mean(self):
         """
-        Returns a new traffic matrix that is the mean across all epochs.
-        :return:
+        Returns a new traffic matrix that is the average across all epochs.
+
         """
         return TrafficMatrix(numpy.reshape(self.matrix.max(axis=2),
                                            (self.num_pops(), self.num_pops(),
@@ -89,7 +93,9 @@ cdef class TrafficMatrix:
 
     cpdef TrafficMatrix worst_case(self):
         """
-        Return a new traffic matrix that chooses maximum traffic through time
+        Return a new, single-epoch traffic matrix that chooses maximum volume
+        per OD pair (in time)
+
         :return: a new TrafficMatrix
         """
         return TrafficMatrix(numpy.reshape(self.matrix.max(axis=2),
@@ -103,12 +109,16 @@ cdef class TrafficMatrix:
         return self.matrix.shape[0]
 
     cpdef int num_epochs(self):
+        """
+        :return:  The number of epochs in this traffic matrix
+        """
         return self.matrix.shape[2]
 
     @staticmethod
-    def from_pickle(str fname):
+    def from_pickle(fname):
         """
         Load a TrafficMatrix object from a file
+
         :param fname: the file name on disk
         :return: new TraffixMatrix
         """

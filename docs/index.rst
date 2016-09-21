@@ -10,4 +10,4 @@ formats, and very basic visualization tools.
 
    quickstart.rst
    api.rst
-   dev.rst
+.. dev.rst

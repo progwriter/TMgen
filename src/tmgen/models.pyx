@@ -3,11 +3,10 @@ from __future__ import division
 
 cimport numpy
 import numpy
-
 from cpython cimport bool
+from six.moves import range
 from tmgen.hmc cimport hmc_exact
 from tmgen.tm cimport TrafficMatrix
-from six.moves import range
 
 cdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
                                     double peak_to_mean,
@@ -17,10 +16,10 @@ cdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
     peak-to-mean ratio, and trough_to_mean ratio.
 
     The generated signal has the form
-    $x = mean*(peaktomean-1)*sin(2*\pi*freq*linspace(0,1,N))+mean$
+    :math:`x = mean*(peaktomean-1)*sin(2*\pi*freq*linspace(0,1,N))+mean`
 
     Note that if the mean m is 0, then
-    $x = peakmean*sin(2*\pi*freq*linspace(0,1,N))$
+    :math:`x = peakmean*sin(2*\pi*freq*linspace(0,1,N))`
 
     Intervals of x below the mean have a drawdown determined by troughmean.
 
@@ -133,7 +132,8 @@ cdef tuple _modulated_gravity(numpy.ndarray mean_row, numpy.ndarray mean_col,
 
 cpdef TrafficMatrix modulated_gravity_tm(int num_pops, int num_tms,
                                          double mean_traffic,
-                                         double pm_ratio=1.5, double t_ratio=.75,
+                                         double pm_ratio=1.5,
+                                         double t_ratio=.75,
                                          double diurnal_freq=1 / 24,
                                          double spatial_variance=100,
                                          double temporal_variance=0.01):
@@ -146,7 +146,8 @@ cpdef TrafficMatrix modulated_gravity_tm(int num_pops, int num_tms,
     :param pm_ratio: peak-to-mean ratio. Peak traffic will be larger by
         this much (must be bigger than 1). Default is 1.5
     :param t_ratio: trough-to-mean ratio. Default is 0.75
-    :param diurnal_freq: Frequency of modulation. Default is 1/24 (i.e., hourly) if you are generating multi-day TMs
+    :param diurnal_freq: Frequency of modulation. Default is 1/24 (i.e., hourly)
+        if you are generating multi-day TMs
     :param spatial_variance: Variance on the volume of traffic between
         origin-destination pairs.
         Pick someting reasonable with respect to your mean_traffic. Default is 100
@@ -194,6 +195,7 @@ cpdef TrafficMatrix gravity_tm(int num_pops, numpy.ndarray populations,
                                double total_traffic):
     """
     Compute the gravity traffic matrix
+
     :param num_pops: number of poins of presence
     :param populations: array with populations (weights) for each PoP
     :param total_traffic: total amount of traffic in the network
@@ -217,8 +219,8 @@ cpdef TrafficMatrix gravity_tm(int num_pops, numpy.ndarray populations,
 #                                  double mean_traffic):
 #     return mean_traffic * numpy.random.log_normal(size=(num_pops, num_pops, 1))
 
-cpdef TrafficMatrix uniform_iid(int num_pops, double low, double high,
-                                int num_epochs=1):
+cpdef TrafficMatrix uniform_tm(int num_pops, double low, double high,
+                               int num_epochs=1):
     """
     Return a uniform traffic matrix. Entries are chosen independently from each other,
     uniformly at random, between given values of low and high.
@@ -248,8 +250,9 @@ cpdef TrafficMatrix spike_tm(int num_pops, int num_spikes, double mean_spike,
                              int num_epochs=1):
     """
     Generate a traffic matrix using the spike model.
+
     :param num_pops: number of nodes in the network
-    :param num_spikes: number of ingress-egress spikes. Must be fewer than $num_pops^2$
+    :param num_spikes: number of ingress-egress spikes. Must be fewer than :math:`numpops^2`
     :param mean_spike: average volume of a single spike
     :param num_epochs: number of time epochs
     :return:
@@ -276,6 +279,5 @@ cpdef TrafficMatrix spike_tm(int num_pops, int num_spikes, double mean_spike,
 
     return TrafficMatrix(tm)
 
-
 __all__ = ['modulated_gravity_tm', 'random_gravity_tm', 'gravity_tm',
-           'uniform_iid', 'exp_tm', 'spike_tm']
+           'uniform_tm', 'exp_tm', 'spike_tm']

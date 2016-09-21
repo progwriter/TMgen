@@ -8,8 +8,8 @@ cpdef TrafficMatrix modulated_gravity_tm(int num_pops, int num_tms,
                                          double diurnal_freq= *,
                                          double spatial_variance= *,
                                          double temporal_variance= *)
-cpdef TrafficMatrix uniform_iid(int num_pops, double low, double high,
-                                int num_epochs=*)
+cpdef TrafficMatrix uniform_tm(int num_pops, double low, double high,
+                               int num_epochs=*)
 cpdef TrafficMatrix exp_tm(int num_pops, double mean_traffic, int num_epochs= *)
 cpdef TrafficMatrix random_gravity_tm(int num_pops, double mean_traffic,
                                       double spatial_variance)
