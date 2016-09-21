@@ -15,6 +15,8 @@ except ImportError as e:
 setup(
     name='tmgen',
     version='0.1.1',
+    description='Library for network traffic matrix generation',
+    keywords=['network', 'traffic', 'matrix'],
 
     author='Victor Heorhiadi',
     author_email='victor@cs.unc.edu',
