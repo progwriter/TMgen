@@ -1,9 +1,7 @@
 # coding=utf-8
 
-from distutils.core import setup
-
-# from setuptools import setup
-# from setuptools.extension import Extension
+from setuptools import setup
+from setuptools.extension import Extension
 
 try:
     import numpy
@@ -12,23 +10,68 @@ except ImportError as e:
     print ('TMgen requires numpy and cython to be installed!')
     raise e
 
+extensions = [
+    Extension(
+        'tmgen.hmc',
+        ['src/tmgen/hmc.pyx'],
+        include_dirs=[numpy.get_include()]
+    ),
+    Extension(
+        'tmgen.models',
+        ['src/tmgen/models.pyx'],
+        include_dirs=[numpy.get_include()]
+    ),
+    Extension(
+        'tmgen.tm',
+        ['src/tmgen/tm.pyx'],
+        include_dirs=[numpy.get_include()]
+    )
+]
+
 setup(
     name='tmgen',
-    version='0.1.1',
+    version='0.1.2',
     description='Library for network traffic matrix generation',
     keywords=['network', 'traffic', 'matrix'],
 
     author='Victor Heorhiadi',
     author_email='victor@cs.unc.edu',
+    license='MIT',
 
     package_dir={'': 'src'},
     packages=['tmgen'],
-    url='https://github.com/progwriter/tmgen',
-    requires=['numpy', 'cython', 'six'],
-    include_dirs=[numpy.get_include()],
-    ext_modules=cythonize("src/tmgen/**/*.pyx", compiler_directives={
-        'embedsignature': True}),
+    url='https://github.com/progwriter/TMgen',
+    install_requires=['numpy', 'cython', 'six'],
+    extras_require={
+        'plotting': ['matplotlib', 'seaborn'],
+    },
+    ext_modules=cythonize(extensions),
     package_data={
         'tmgen': ['*.pxd'],
-    }
+    },
+    include_dirs=[numpy.get_include()],
+    entry_points={
+        'console_scripts': [
+            'tmditg = tmgen.inject.ditg_injector:main'
+        ],
+    },
+
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+
+        'Intended Audience :: Science/Research'
+        'Topic :: Software Development :: Build Tools',
+
+
+        'License :: OSI Approved :: MIT License',
+
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+
+        'Topic :: System :: Networking'
+    ]
+
 )
