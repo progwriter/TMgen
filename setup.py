@@ -1,6 +1,6 @@
 # coding=utf-8
 
-from setuptools import setup
+from setuptools import setup, find_packages
 from setuptools.extension import Extension
 
 try:
@@ -39,7 +39,7 @@ setup(
     license='MIT',
 
     package_dir={'': 'src'},
-    packages=['tmgen'],
+    packages=find_packages('src'),
     url='https://github.com/progwriter/TMgen',
     install_requires=['numpy', 'cython', 'six'],
     extras_require={
