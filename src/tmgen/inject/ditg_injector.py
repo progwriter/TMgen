@@ -1,14 +1,25 @@
 #! /usr/bin/env/python
 
-
 # coding=utf-8
+from __future__ import print_function
 
 import argparse
 import json
+import signal
+import sys
 from math import ceil
 from subprocess import Popen
 
 from tmgen.inject import InjectorBase
+
+
+def interrupt_handler(sig, frame):
+    global injector
+    if sig == signal.SIGINT:
+        injector.stop()
+
+
+signal.signal(signal.SIGINT, interrupt_handler)
 
 
 class DITGinjector(InjectorBase):
@@ -39,21 +50,24 @@ class DITGinjector(InjectorBase):
         num_epochs = self.tm.num_epochs()
         # Each epoch new set of ITGSend will be started
         for e in range(num_epochs):
+            print('Epoch %d' % e)
             # Get the TM values
             tm = self.tm.at_time(e)
             # Keep track of the subprocesses, we will need to wait on them
-            processes = []
+            self._send_processes = []
             # For each logical destination there will be multiple IP addresses
-            for dstID, ips in self.destinations:
+            for dstID, ips in self.destinations.items():
                 # For each IP start a new sender, limited by the time of epoch_length
                 for ip in ips:
-                    p = Popen([self.recv_exec, '-t', self.epoch_length * 1000,
-                               '-a', ip, '-T', 'UDP', '-d', 100, '-C',
-                               ceil(tm[self.ID, dstID] * self.scale_factor)])
+                    print (ip)
+                    p = Popen([self.send_exec, '-t', str(self.epoch_length * 1000),
+                               '-a', ip, '-T', 'UDP', '-d', str(100), '-C',
+                               str(ceil(tm[self.ID, int(dstID)] * self.scale_factor))],
+                              stdout=sys.stdout, stderr=sys.stderr)
                     # Store process
-                    processes.append(p)
+                    self._send_processes.append(p)
             # Wait until epoch ends and all senders complete
-            for p in processes:
+            for p in self._send_processes:
                 p.wait()
 
     def run(self):
@@ -61,20 +75,28 @@ class DITGinjector(InjectorBase):
         r = self._start_receiver()
         self._start_senders()
         # Must kill the reciever
-        r.terminate()
+        r.send_signal(signal.SIGINT)
+
+    def stop(self):
+        self._receiver_process.send_signal(signal.SIGINT)
+        for p in self._send_processes:
+            p.send_signal(signal.SIGINT)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tm', help='The traffic matrix filename', required=True)
     parser.add_argument('-l', '--epoch-length', type=int, help='Length of an epoch, in seconds', required=True)
-    parser.add_argument('-i', '--id', type=int, help='The integer ID of the traffic matrix node source entry')
-    parser.add_argument('-s', '--scale', type=float, help='Scale the TM entries by this factor')
+    parser.add_argument('-i', '--id', type=int, help='The integer ID of the traffic matrix node source entry',
+                        required=True)
+    parser.add_argument('-s', '--scale', type=float, help='Scale the TM entries by this factor',
+                        default=1)
     parser.add_argument('-d', '--destinations', help='Mapping of integer IDs to IP addresses')
     options = parser.parse_args()
 
-    DITGinjector(options.tm, options.epoch_length, options.id, json.loads(options.destinaiton),
-                 scale_factor=options.scale)
+    injector = DITGinjector(options.tm, options.epoch_length, options.id, json.loads(options.destinations),
+                            scale_factor=options.scale)
+    injector.run()
 
 
 if __name__ == '__main__':
