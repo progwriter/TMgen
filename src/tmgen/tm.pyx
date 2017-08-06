@@ -34,13 +34,13 @@ cdef class TrafficMatrix:
             First two dimensions must match, as a single traffic matrix is
             always n x n.
         """
-        self.matrix = tm
         if not tm.ndim == 3:  # 2d + time
             raise ValueError('Traffic matrix must have 3 dimensions: n x n x m,'
                              'where n is number of nodes and m is number of '
                              'epochs (at least 1)')
-        if not tm.shape[0] == tm.shape[1]:  # num_pops both ways
-            raise ValueError('Traffic matrix dimensions must match')
+        if not tm.shape[0] == tm.shape[1]:  # num_nodes both ways
+            raise ValueError('First two dimentions of the traffic matrix must match')
+        self.matrix = tm
 
 
     cpdef numpy.ndarray at_time(self, int t):
@@ -79,8 +79,23 @@ cdef class TrafficMatrix:
 
         :param fname: the file name
         """
-        with open(fname, 'w') as f:
+        with open(fname, 'wb') as f:
             cPickle.dump(self.matrix, f)
+
+    cpdef to_csv(self, fname):
+        """
+        Save the matrix to a CSV file.
+
+        .. warning:
+            Note that if the matrix has more than one epoch, it will be "flattened".
+            In this case each line will have :math:`n^2 entries`.
+            Each row is a single epoch with a flattened array of ingress-egress nodes.
+        """
+        if self.num_epochs() > 1:
+            m = self.matrix.reshape((self.num_nodes() ** 2, self.num_epochs()))
+            numpy.savetxt(fname, m, delimiter=',')
+        else:
+            numpy.savetxt(fname, self.matrix, delimiter=',')
 
     cpdef TrafficMatrix mean(self):
         """
@@ -88,8 +103,8 @@ cdef class TrafficMatrix:
 
         """
         return TrafficMatrix(numpy.reshape(self.matrix.max(axis=2),
-                                           (self.num_pops(), self.num_pops(),
-                                           1)))
+                                           (self.num_nodes(), self.num_nodes(),
+                                            1)))
 
     cpdef TrafficMatrix worst_case(self):
         """
@@ -99,12 +114,12 @@ cdef class TrafficMatrix:
         :return: a new TrafficMatrix
         """
         return TrafficMatrix(numpy.reshape(self.matrix.max(axis=2),
-                                           (self.num_pops(), self.num_pops(),
+                                           (self.num_nodes(), self.num_nodes(),
                                             1)))
 
-    cpdef int num_pops(self):
+    cpdef int num_nodes(self):
         """
-        :return: The number of PoPs in this traffic matrix
+        :return: The number of nodes in this traffic matrix
         """
         return self.matrix.shape[0]
 
@@ -122,7 +137,7 @@ cdef class TrafficMatrix:
         :param fname: the file name on disk
         :return: new TraffixMatrix
         """
-        with open(fname, 'r') as f:
+        with open(fname, 'rb') as f:
             return TrafficMatrix(cPickle.load(f))
 
     def __repr__(self):

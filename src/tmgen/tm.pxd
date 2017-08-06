@@ -8,9 +8,12 @@ cdef class TrafficMatrix:
     """
     cdef public numpy.ndarray matrix
     cpdef numpy.ndarray at_time(self, int t)
-    cpdef between(self, int o, int d, modestr=*)
-    cpdef to_pickle(self, fname)
     cpdef TrafficMatrix worst_case(self)
     cpdef TrafficMatrix mean(self)
-    cpdef int num_pops(self)
+    cpdef int num_nodes(self)
     cpdef int num_epochs(self)
+
+    # I/O functions
+    cpdef between(self, int o, int d, modestr=*)
+    cpdef to_pickle(self, fname)
+    cpdef to_csv(self, fname)
