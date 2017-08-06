@@ -4,51 +4,70 @@
 import numpy
 cimport numpy
 from cpython cimport bool
+from numpy.linalg import cholesky
 
-cdef numpy.ndarray mldivide(numpy.ndarray a, numpy.ndarray b):
+cdef numpy.ndarray _mldivide(numpy.ndarray a, numpy.ndarray b):
     return numpy.linalg.solve(a, b)
 
-cdef numpy.ndarray mrdivide(numpy.ndarray a, numpy.ndarray b):
+cdef numpy.ndarray _mrdivide(numpy.ndarray a, numpy.ndarray b):
     return numpy.linalg.solve(a.T, b.T).T
 
-# TODO: implement cov=False
 cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
-                             numpy.ndarray constraint_m, numpy.ndarray mu_r,
+                             numpy.ndarray m, numpy.ndarray mu_r,
                              bool covariance, int num_samples,
                              numpy.ndarray initial_x):
-    cdef int m = g.shape[0]
-    if not f.shape[0] == m:
+
+
+    """
+    Implementation of the algorithm described in http://arxiv.org/abs/1208.4118
+    
+    Hamiltonian Monte Carlo method for sampling from a d-dimensional multivariate gaussian distrbution,
+    subject to linear constraints :math:`f*x + g \geg 0`
+    
+    :param f: :math:`m \times d` matrix 
+    :param g: :math:`m \times 1` vector 
+    :param m: :math:`d \times d` symmetric, definite positive matrix
+    :param mu_r: :math:`d \times 1` vector 
+    :param covariance: 
+        If covariance is True then m is the covariance matrix otherwise m is the precision matrix 
+    :param num_samples: 
+        number of desired samples
+    :param initial_x: :math:`d \times 1` initialization vector, must satisfy the given constraints 
+    :return: 
+        a :math:`d \times num_samples` matrix where each column is a sample
+    """
+    assert g.ndim == 1
+    if not f.shape[0] != g.size:
         raise ValueError('First dimension of f and g must match')
 
-    cdef numpy.ndarray mu
-    cdef numpy.ndarray r = numpy.linalg.cholesky(constraint_m)
+    cdef numpy.ndarray mu, temp_r
+    cdef numpy.ndarray r = cholesky(m)
     if covariance:
         mu = mu_r
-        g = g + numpy.matmul(f, mu)
+        g += numpy.matmul(f, mu)
         f = numpy.matmul(f, r.T)
-        initial_x = initial_x - mu
-        initial_x = mldivide(r.T, initial_x)
+        initial_x -= mu
+        initial_x = _mldivide(r.T, initial_x)
     else:
-        raise NotImplementedError(
-            "Non-covariance constraints are not yet implemented")
-        # mu = numpy.linalg.solve(r, numpy.linalg.solve(r.T, mu_r))
-        # g = g + numpy.matmul(f, mu)
-        # f = numpy.matmul(r, numpy.linalg.inverse(f))
-        # initial_x = initial_x - mu
-        # initial_x = numpy.matmul(r, initial_x)
+        # raise NotImplementedError("Non-covariance constraints are not yet implemented")
+        r = cholesky(m)
+        mu = _mldivide(r, _mldivide(r.T, mu_r))
+        g += numpy.matmul(f, mu)
+        f = numpy.matmul(r, numpy.linalg.inverse(f))
+        initial_x = initial_x - mu
+        initial_x = numpy.matmul(r, initial_x)
 
     cdef int d = initial_x.shape[0]
     cdef int bounce_count = 0
     cdef double near_zero = 10000 * numpy.finfo(numpy.float64).eps
 
     # Verify that initial_x is feasible
-
     cdef numpy.ndarray c = numpy.matmul(f, initial_x) + g
     if numpy.any(c < 0):
-        raise ValueError('Error: inconsistent initial condition')
+        raise ValueError('Error: Initial condition violates the constraints')
 
     # squared norm of the rows of F, needed for reflecting the velocity
-    cdef numpy.ndarray f2 = numpy.sum(numpy.multiply(f, f), axis=1)
+    cdef numpy.ndarray f2 = numpy.sum(f * f, axis=2)
 
     ## Sampling loop
     cdef numpy.ndarray last_x = initial_x
@@ -81,13 +100,12 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
             u = numpy.sqrt(numpy.square(fa) + numpy.square(fb))
             phi = numpy.arctan2(-fa, fb)  # -pi < phi < +pi
 
-            div_result = numpy.absolute(numpy.divide(g, u))
+            div_result = numpy.absolute(g/u)
             pn = (div_result <= 1)  # these are the walls that may be hit
 
             # find the first time constraint becomes zero
             if numpy.any(pn):
-                inds = numpy.where(div_result <= 1)[0]
-                # print(inds)
+                inds = div_result <= 1
                 phn = phi[pn]
                 t1 = -phn + numpy.arccos(
                     -g[pn] / u[pn])  # time at which coordinates hit the walls
@@ -99,9 +117,7 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
                 # make sure that a new reflection at j is not found because of numerical error
                 if j > 0:
                     if pn[j]:
-                        cs = numpy.cumsum(
-                            numpy.where(div_result <= 1, div_result,
-                                        numpy.zeros(div_result.size)))
+                        cs = numpy.cumsum(pn)
                         indj = cs[j]
                         tt1 = t1[indj]
                         if numpy.absolute(tt1) < near_zero or numpy.absolute(
@@ -131,7 +147,7 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
                 break
 
             # compute reflected velocity
-            qj = numpy.matmul(f[:, j], v) / f2[j]
+            qj = numpy.matmul(f[j, :], v) / f2[j]
             v0 = v - 2 * qj * f.T[:, j]
             bounce_count += 1
 
@@ -143,13 +159,13 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
             result_xs[:, i] = x
             last_x = x
             i += 1
-        else:
-            print('HMC reject')
+        # else:
+        #     print('HMC reject')
 
     # transform back to the unwhitened frame
     if covariance:
-        result_xs = numpy.matmul(r.T, result_xs) + numpy.tile(mu, (2, 1)).T
-    # else:
-    #     result_xs = numpy.linalg.solve(r, result_xs) + numpy.tile(mu, (1, 2)).T
+        result_xs = numpy.matmul(r.T, result_xs) + numpy.tile(mu, (1, num_samples)).T
+    else:
+        result_xs = numpy.linalg.solve(r, result_xs) + numpy.tile(mu, (1, num_samples)).T
 
     return result_xs
