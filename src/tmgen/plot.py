@@ -1,13 +1,17 @@
+# coding=utf-8
+import warnings
 try:
     import seaborn
     seaborn.set(style='white')
 except ImportError:
-    import warnings
-    warnings.warn('Consider installing searbon package for prettier graphs',
+    warnings.warn('Please consider installing searbon package for prettier graphs',
                   category=ImportError)
-from matplotlib import pyplot as plt
+try:
+    from matplotlib import pyplot as plt
+except ImportError as e:
+    warnings.warn('Plotting functionality requires the matplotlib library')
+    raise e
 from six.moves import range
-
 
 
 def heatmap(tm, epoch=None):
@@ -38,7 +42,7 @@ def heatmap(tm, epoch=None):
         tmgen.plot.heatmap(tm)
         plt.show()  # display the graph interactively
     """
-    n = tm.num_pops()
+    n = tm.num_nodes()
     reshaped = False
     if epoch is not None:
         matrix = tm.at_time(epoch)
@@ -49,7 +53,7 @@ def heatmap(tm, epoch=None):
             matrix = tm.matrix.reshape((n * n, tm.num_epochs()))
             reshaped = True
     if not reshaped:
-        seaborn.heatmap(matrix)
+        seaborn.heatmap(matrix, cmap='viridis')
         plt.xlabel('Node')
         plt.ylabel('Node')
         plt.title('Volume at epoch {}'.format(epoch if epoch is not None
@@ -85,7 +89,7 @@ def timeseries(tm):
         plt.show()  # display the graph interactively
 
     """
-    n = tm.num_pops()
+    n = tm.num_nodes()
     for i in range(n):
         for e in range(n):
             plt.plot(tm.between(i, e, 'all'))
