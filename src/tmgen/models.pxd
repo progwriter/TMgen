@@ -11,7 +11,8 @@ cpdef TrafficMatrix modulated_gravity_tm(int num_pops, int num_tms,
 cpdef TrafficMatrix uniform_tm(int num_pops, double low, double high,
                                int num_epochs=*)
 cpdef TrafficMatrix exp_tm(int num_pops, double mean_traffic, int num_epochs= *)
-cpdef TrafficMatrix random_gravity_tm(int num_pops, double mean_traffic,
-                                      double spatial_variance)
+cpdef TrafficMatrix random_gravity_tm(int num_pops, double mean_traffic)
 cpdef TrafficMatrix spike_tm(int num_pops, int num_spikes, double mean_spike,
                              int num_epochs= *)
+cpdef TrafficMatrix gravity_tm(populations, double total_traffic)
+cpdef TrafficMatrix exact_tm(int num_pops, double val, double num_epochs=*)
