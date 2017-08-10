@@ -42,40 +42,40 @@ class DITGinjector(InjectorBase):
         self._receiver_process = Popen(self.recv_exec)
         return self._receiver_process
 
-    def _start_senders(self):
+    def _start_senders(self, e):
         """
         Start multiple senders at each epoch
         :return: 
         """
+        # Get the TM values
+        tm = self.tm.at_time(e)
+        # Keep track of the subprocesses, we will need to wait on them
+        self._send_processes = []
+        # For each logical destination there will be multiple IP addresses
+        for dstID, ips in self.destinations.items():
+            # For each IP start a new sender, limited by the time of epoch_length
+            for ip in ips:
+                print (ip)
+                p = Popen([self.send_exec, '-t', str(self.epoch_length * 1000),
+                           '-a', ip, '-T', 'UDP', '-d', str(100), '-C',
+                           str(ceil(tm[self.ID, int(dstID)] * self.scale_factor))],
+                          stdout=sys.stdout, stderr=sys.stderr)
+                # Store process
+                self._send_processes.append(p)
+        # Wait until epoch ends and all senders complete
+        for p in self._send_processes:
+            p.wait()
+
+    def run(self):
+        """ Execute the injection """
         num_epochs = self.tm.num_epochs()
         # Each epoch new set of ITGSend will be started
         for e in range(num_epochs):
             print('Epoch %d' % e)
-            # Get the TM values
-            tm = self.tm.at_time(e)
-            # Keep track of the subprocesses, we will need to wait on them
-            self._send_processes = []
-            # For each logical destination there will be multiple IP addresses
-            for dstID, ips in self.destinations.items():
-                # For each IP start a new sender, limited by the time of epoch_length
-                for ip in ips:
-                    print (ip)
-                    p = Popen([self.send_exec, '-t', str(self.epoch_length * 1000),
-                               '-a', ip, '-T', 'UDP', '-d', str(100), '-C',
-                               str(ceil(tm[self.ID, int(dstID)] * self.scale_factor))],
-                              stdout=sys.stdout, stderr=sys.stderr)
-                    # Store process
-                    self._send_processes.append(p)
-            # Wait until epoch ends and all senders complete
-            for p in self._send_processes:
-                p.wait()
-
-    def run(self):
-        """ Execute the injection """
-        r = self._start_receiver()
-        self._start_senders()
-        # Must kill the reciever
-        r.send_signal(signal.SIGINT)
+            r = self._start_receiver()
+            self._start_senders(e)
+            # Must kill the reciever
+            r.send_signal(signal.SIGINT)
 
     def stop(self):
         self._receiver_process.send_signal(signal.SIGINT)
