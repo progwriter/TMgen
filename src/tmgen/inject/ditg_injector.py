@@ -59,7 +59,7 @@ class DITGinjector(InjectorBase):
                 p = Popen([self.send_exec, '-t', str(self.epoch_length * 1000),
                            '-a', ip, '-T', 'UDP', '-d', str(100), '-C',
                            str(ceil(tm[self.ID, int(dstID)] * self.scale_factor)),
-                           '-rp', self.port],
+                           '-rp', str(self.port)],
                           stdout=sys.stdout, stderr=sys.stderr)
                 # Store process
                 self._send_processes.append(p)
