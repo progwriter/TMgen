@@ -41,7 +41,7 @@ class DITGinjector(InjectorBase):
 
     def _start_receiver(self):
         """ Starts a single receiver """
-        self._receiver_process = Popen(self.recv_exec)
+        self._receiver_process = Popen([self.recv_exec, '-Sp', str(self.sig_port)])
         return self._receiver_process
 
     def _start_senders(self, e):
@@ -97,7 +97,7 @@ def main():
                         default=1)
     parser.add_argument('-d', '--destinations', help='Mapping of integer IDs to IP addresses')
     parser.add_argument('-p', '--port', type=int, help='DITG receiver port')
-    parser.add_argument('--sigport', type=int, help='DITG singnalint port')
+    parser.add_argument('--sigport', default=10435, type=int, help='DITG singnalint port')
     options = parser.parse_args()
 
     injector = DITGinjector(options.tm, options.epoch_length, options.id, json.loads(options.destinations),
