@@ -68,8 +68,9 @@ class DITGinjector(InjectorBase):
                 # Store process
                 self._send_processes.append(p)
         # Wait until epoch ends and all senders complete
-        for p in self._send_processes:
-            p.wait()
+        while any(x.poll() is None for x in self._send_processes):
+            for p in self._send_processes:
+                p.wait()
 
     def run(self):
         """ Execute the injection """
@@ -80,7 +81,6 @@ class DITGinjector(InjectorBase):
         time.sleep(SLEEP_GAP)
         for e in range(num_epochs):
             self._start_senders(e)
-            time.sleep(SLEEP_GAP)
         # Must kill the reciever
         r.send_signal(signal.SIGINT)
         r.wait()
