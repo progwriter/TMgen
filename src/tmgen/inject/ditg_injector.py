@@ -31,11 +31,12 @@ class DITGinjector(InjectorBase):
     D-ITG: http://www.grid.unina.it/software/ITG/
     """
 
-    def __init__(self, tm_fname, epoch_length, ID, destinations, port, scale_factor=1):
+    def __init__(self, tm_fname, epoch_length, ID, destinations, port, sig_port, scale_factor=1):
         super(DITGinjector, self).__init__(tm_fname, epoch_length, ID, destinations)
         self.recv_exec = 'ITGRecv'
         self.send_exec = 'ITGSend'
         self.port = port
+        self.sig_port = sig_port
         self.scale_factor = scale_factor
 
     def _start_receiver(self):
@@ -59,7 +60,8 @@ class DITGinjector(InjectorBase):
                 p = Popen([self.send_exec, '-t', str(self.epoch_length * 1000),
                            '-a', ip, '-T', 'UDP', '-d', str(100), '-C',
                            str(ceil(tm[self.ID, int(dstID)] * self.scale_factor)),
-                           '-rp', str(self.port)],
+                           '-rp', str(self.port),
+                           '-Sdp', str(self.sig_port)],
                           stdout=sys.stdout, stderr=sys.stderr)
                 # Store process
                 self._send_processes.append(p)
@@ -95,10 +97,11 @@ def main():
                         default=1)
     parser.add_argument('-d', '--destinations', help='Mapping of integer IDs to IP addresses')
     parser.add_argument('-p', '--port', type=int, help='DITG receiver port')
+    parser.add_argument('--sigport', type=int, help='DITG singnalint port')
     options = parser.parse_args()
 
     injector = DITGinjector(options.tm, options.epoch_length, options.id, json.loads(options.destinations),
-                            options.port,
+                            options.port, options.sigport,
                             scale_factor=options.scale)
     injector.run()
 
