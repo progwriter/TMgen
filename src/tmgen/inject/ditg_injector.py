@@ -62,7 +62,7 @@ class DITGinjector(InjectorBase):
                            str(ceil(tm[self.ID, int(dstID)] * self.scale_factor)),
                            '-rp', str(self.port),
                            '-Sdp', str(self.sig_port)],
-                          stdout=sys.stdout, stderr=sys.stderr)
+                          stdout=None, stderr=sys.stderr)
                 # Store process
                 self._send_processes.append(p)
         # Wait until epoch ends and all senders complete
@@ -73,24 +73,25 @@ class DITGinjector(InjectorBase):
         """ Execute the injection """
         num_epochs = self.tm.num_epochs()
         # Each epoch new set of ITGSend will be started
+        r = self._start_receiver()
         for e in range(num_epochs):
             print('Epoch %d' % e)
-            r = self._start_receiver()
             self._start_senders(e)
-            # Must kill the reciever
-            r.send_signal(signal.SIGINT)
-            r.wait()
+        # Must kill the reciever
+        r.send_signal(signal.SIGINT)
+        r.wait()
 
     def stop(self):
+        print('Stopping the injector')
+        # for p in self._send_processes:
+        #     p.send_signal(signal.SIGINT)
         self._receiver_process.send_signal(signal.SIGINT)
-        for p in self._send_processes:
-            p.send_signal(signal.SIGINT)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tm', help='The traffic matrix filename', required=True)
-    parser.add_argument('-l', '--epoch-length', type=int, help='Length of an epoch, in seconds', required=True)
+    parser.add_argument('-l', '--epoch-length', type=float, help='Length of an epoch, in seconds', required=True)
     parser.add_argument('-i', '--id', type=int, help='The integer ID of the traffic matrix node source entry',
                         required=True)
     parser.add_argument('-s', '--scale', type=float, help='Scale the TM entries by this factor',
