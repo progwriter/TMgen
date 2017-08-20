@@ -31,10 +31,11 @@ class DITGinjector(InjectorBase):
     D-ITG: http://www.grid.unina.it/software/ITG/
     """
 
-    def __init__(self, tm_fname, epoch_length, ID, destinations, scale_factor=1):
+    def __init__(self, tm_fname, epoch_length, ID, destinations, port, scale_factor=1):
         super(DITGinjector, self).__init__(tm_fname, epoch_length, ID, destinations)
         self.recv_exec = 'ITGRecv'
         self.send_exec = 'ITGSend'
+        self.port = port
         self.scale_factor = scale_factor
 
     def _start_receiver(self):
@@ -55,10 +56,10 @@ class DITGinjector(InjectorBase):
         for dstID, ips in self.destinations.items():
             # For each IP start a new sender, limited by the time of epoch_length
             for ip in ips:
-                print (ip)
                 p = Popen([self.send_exec, '-t', str(self.epoch_length * 1000),
                            '-a', ip, '-T', 'UDP', '-d', str(100), '-C',
-                           str(ceil(tm[self.ID, int(dstID)] * self.scale_factor))],
+                           str(ceil(tm[self.ID, int(dstID)] * self.scale_factor)),
+                           '-rp', self.port],
                           stdout=sys.stdout, stderr=sys.stderr)
                 # Store process
                 self._send_processes.append(p)
@@ -76,6 +77,7 @@ class DITGinjector(InjectorBase):
             self._start_senders(e)
             # Must kill the reciever
             r.send_signal(signal.SIGINT)
+            r.wait()
 
     def stop(self):
         self._receiver_process.send_signal(signal.SIGINT)
@@ -92,9 +94,11 @@ def main():
     parser.add_argument('-s', '--scale', type=float, help='Scale the TM entries by this factor',
                         default=1)
     parser.add_argument('-d', '--destinations', help='Mapping of integer IDs to IP addresses')
+    parser.add_argument('-p', '--port', type=int, help='DITG receiver port')
     options = parser.parse_args()
 
     injector = DITGinjector(options.tm, options.epoch_length, options.id, json.loads(options.destinations),
+                            options.port,
                             scale_factor=options.scale)
     injector.run()
 
