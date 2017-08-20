@@ -22,7 +22,7 @@ def interrupt_handler(sig, frame):
 
 
 signal.signal(signal.SIGINT, interrupt_handler)
-SLEEP_GAP = 2  # two seconds should be enough to spin up receivers
+SLEEP_GAP = 1  # should be enough to spin up receivers or kill senders
 
 class DITGinjector(InjectorBase):
     """
@@ -75,12 +75,14 @@ class DITGinjector(InjectorBase):
     def run(self):
         """ Execute the injection """
         num_epochs = self.tm.num_epochs()
-        # wait for receivers to spin up on all nodes
         for e in range(num_epochs):
             # Each epoch new set of ITGSend will be started
             r = self._start_receiver()
+            # wait for receivers to spin up on all nodes
             time.sleep(SLEEP_GAP)
             self._start_senders(e)
+            # wait for senders to shut down gracefully on all nodes
+            time.sleep(SLEEP_GAP)
             # Must kill the reciever
             r.send_signal(signal.SIGINT)
             r.wait()
