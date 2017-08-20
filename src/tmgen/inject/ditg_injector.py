@@ -80,6 +80,7 @@ class DITGinjector(InjectorBase):
         time.sleep(SLEEP_GAP)
         for e in range(num_epochs):
             self._start_senders(e)
+            time.sleep(SLEEP_GAP)
         # Must kill the reciever
         r.send_signal(signal.SIGINT)
         r.wait()
