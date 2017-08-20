@@ -75,15 +75,15 @@ class DITGinjector(InjectorBase):
     def run(self):
         """ Execute the injection """
         num_epochs = self.tm.num_epochs()
-        # Each epoch new set of ITGSend will be started
-        r = self._start_receiver()
         # wait for receivers to spin up on all nodes
-        time.sleep(SLEEP_GAP)
         for e in range(num_epochs):
+            # Each epoch new set of ITGSend will be started
+            r = self._start_receiver()
+            time.sleep(SLEEP_GAP)
             self._start_senders(e)
-        # Must kill the reciever
-        r.send_signal(signal.SIGINT)
-        r.wait()
+            # Must kill the reciever
+            r.send_signal(signal.SIGINT)
+            r.wait()
 
     def stop(self):
         print('Stopping the injector')
