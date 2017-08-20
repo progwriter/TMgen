@@ -10,6 +10,8 @@ import sys
 from math import ceil
 from subprocess import Popen
 
+import time
+
 from tmgen.inject import InjectorBase
 
 
@@ -20,7 +22,7 @@ def interrupt_handler(sig, frame):
 
 
 signal.signal(signal.SIGINT, interrupt_handler)
-
+SLEEP_GAP = 2  # two seconds should be enough to spin up receivers
 
 class DITGinjector(InjectorBase):
     """
@@ -74,8 +76,9 @@ class DITGinjector(InjectorBase):
         num_epochs = self.tm.num_epochs()
         # Each epoch new set of ITGSend will be started
         r = self._start_receiver()
+        # wait for receivers to spin up on all nodes
+        time.sleep(SLEEP_GAP)
         for e in range(num_epochs):
-            print('Epoch %d' % e)
             self._start_senders(e)
         # Must kill the reciever
         r.send_signal(signal.SIGINT)
