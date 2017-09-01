@@ -307,7 +307,7 @@ cpdef TrafficMatrix lognormal_tm(int num_nodes, double mean_traffic, double sigm
                                                 size=(num_nodes, num_nodes,
                                                      num_epochs)).clip(min=0))
 
-cpdef TrafficMatrix exact_tm(int num_nodes, double val, double num_epochs=1):
+cpdef TrafficMatrix exact_tm(int num_nodes, double val, int num_epochs=1):
     """
     Create a traffic matrix where each value has exact value *val*.
 

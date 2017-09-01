@@ -15,4 +15,4 @@ cpdef TrafficMatrix random_gravity_tm(int num_pops, double mean_traffic)
 cpdef TrafficMatrix spike_tm(int num_pops, int num_spikes, double mean_spike,
                              int num_epochs= *)
 cpdef TrafficMatrix gravity_tm(populations, double total_traffic)
-cpdef TrafficMatrix exact_tm(int num_pops, double val, double num_epochs=*)
+cpdef TrafficMatrix exact_tm(int num_pops, double val, int num_epochs=*)
