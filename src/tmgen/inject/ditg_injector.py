@@ -89,9 +89,9 @@ class DITGinjector(InjectorBase):
 
     def stop(self):
         print('Stopping the injector')
-        # for p in self._send_processes:
-        #     p.send_signal(signal.SIGINT)
-        self._receiver_process.send_signal(signal.SIGINT)
+        for p in self._send_processes:
+            p.terminate()
+        self._receiver_process.terminate()
 
 
 def main():
