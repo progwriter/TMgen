@@ -10,4 +10,6 @@ formats, and very basic visualization tools.
 
    quickstart.rst
    api.rst
-.. dev.rst
+
+Traffic generation/injection
+----------------------------

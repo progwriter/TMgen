@@ -6,16 +6,24 @@ This document oulitnes how to easily start using the TMgen tool.
 Download and installation
 -------------------------
 
-Since tmgen in still under developmnet please install from the github repository
+Using pip
+^^^^^^^^^
+
+::
+
+    pip install tmgen
+
+From source
+^^^^^^^^^^^
 
 1. Clone ::
 
     git clone https://github.com/progwriter/tmgen
 
-2. Install using pip ::
+2. Install using pip in development mode ::
 
     cd tmgen
-    pip install .
+    pip install -e .
 
 Example usage
 -------------
@@ -28,8 +36,8 @@ that do not have a time component, the third dimension is of size 1.
 Quick overview on how to use them is given here,
 for full details please see the :ref:`API`
 
-Generating a traffc matrix
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+Generating a traffic matrix
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Lets generate a uniform traffic matrix for a network with 3 nodes:
 
@@ -52,8 +60,8 @@ node pair, with only one time epoch.
 Accessing tm entries
 ^^^^^^^^^^^^^^^^^^^^
 
-TMgen gives you a number of ways to access the tm values. Lets generate an
-exponentiam TM with the mean volume of 500 and 2 time epochs.
+TMgen gives you a number of ways to access the TM values. Lets generate an
+exponential TM with the mean volume of 500 and 2 time epochs.
 
   >>> from tmgen import exp_tm
   >>> tm = exp_tm(3, 500, 2)
@@ -86,12 +94,12 @@ Or the values between any node pair:
   >>> tm.between(0,2,'mean')
   675.69716270379729
 
-See :ref:`API` for functions.
+See :ref:`API` for all supported functions.
 
 Saving/Loading a traffic matrix
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-TMs can be easily loaded to pickle and from pickle:
+TMs can be easily loaded using the python-native pickle format:
 
   >>> tm.to_pickle('mytm')
-  >>> tm = TrafficMatrix.from_pickle('saved_tm')
+  >>> tm = TrafficMatrix.from_pickle('mytm')

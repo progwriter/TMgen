@@ -12,7 +12,7 @@ Generators
 TrafficMatrix instance
 ----------------------
 
-.. autoclass:: tmgen.tm.TrafficMatrix
+.. autoclass:: tmgen.TrafficMatrix
   :members:
 
 Plotting
@@ -20,3 +20,5 @@ Plotting
 
 .. automodule:: tmgen.plot
   :members:
+
+
