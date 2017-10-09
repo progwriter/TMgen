@@ -10,16 +10,12 @@ convenience.
 
 ## Supported TM models
 
-*This is work in progress*
-
 - [x] Random Gravity Model
 - [x] Modulated Gravity Model
-- [ ] Non-stationary Conditionally Independent Model
+- [x] Non-stationary Conditionally Independent Model
 - [x] Spike Model
 - [x] Gravity Model
-- [x] Uniform
-- [ ] Log-normal Model
-- [ ] Poisson Model
+- [x] Uniform Model
 
 ## Installation
 
@@ -29,8 +25,6 @@ convenience.
 ## Example Usage
 
 See http://tmgen.readthedocs.io/ for the docs.
-
-**More on model generation coming soon**
 
 ## Big Thanks
 To Paul Tune, Matthew Roughan, and Ari Pakman for their work in this space and
