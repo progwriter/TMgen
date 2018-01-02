@@ -10,10 +10,10 @@ class InjectorBase(object):
     def __init__(self, tm_fname, epoch_length, ID, destinations):
         """
         Create a new traffic injector
-        
+
         :param tm_fname: the traffic matrix filename
         :param epoch_length: length of a single epoch, in seconds
-        :param ID: the integer ID of this injector 
+        :param ID: the integer ID of this injector
             (to determine correct flow volumes)
         :param destinations: a dictionary mapping integer node IDs to IP addresses (as strings)
         """
