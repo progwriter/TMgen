@@ -63,3 +63,6 @@ target/
 *.c
 watch.sh
 MANIFEST
+
+# PyCharm folder
+.idea
