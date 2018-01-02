@@ -7,7 +7,7 @@ try:
     import numpy
     from Cython.Build import cythonize
 except ImportError as e:
-    print ('TMgen requires numpy and cython to be installed!')
+    print('TMgen requires numpy and cython to be installed!')
     raise e
 
 extensions = [
@@ -45,6 +45,7 @@ setup(
     extras_require={
         'plotting': ['matplotlib', 'seaborn'],
     },
+    tests_require=['pytest', 'flake8'],
     ext_modules=cythonize(extensions),
     package_data={
         'tmgen': ['*.pxd'],
@@ -66,6 +67,7 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
 
         'Topic :: System :: Networking',
         'Topic :: Software Development :: Libraries :: Python Modules'
