@@ -2,7 +2,7 @@
 
 import numpy
 cimport numpy
-from six.moves import cPickle # for py 2/3 compat
+from six.moves import cPickle  # for py 2/3 compat
 
 ctypedef enum EntryMode:
     ALL, MIN, MAX, MEAN
@@ -39,9 +39,9 @@ cdef class TrafficMatrix:
                              'where n is number of nodes and m is number of '
                              'epochs (at least 1)')
         if not tm.shape[0] == tm.shape[1]:  # num_nodes both ways
-            raise ValueError('First two dimentions of the traffic matrix must match')
+            raise ValueError(
+                'First two dimentions of the traffic matrix must match')
         self.matrix = tm
-
 
     cpdef numpy.ndarray at_time(self, int t):
         """
@@ -135,7 +135,7 @@ cdef class TrafficMatrix:
         Load a TrafficMatrix object from a file
 
         :param fname: the file name on disk
-        :return: new TraffixMatrix
+        :return: new TrafficMatrix
         """
         with open(fname, 'rb') as f:
             return TrafficMatrix(cPickle.load(f))
