@@ -78,7 +78,7 @@ cpdef TrafficMatrix modulated_gravity_tm(int num_nodes, int num_tms,
         if you are generating multi-day TMs
     :param spatial_variance: Variance on the volume of traffic between
         origin-destination pairs.
-        Pick something reasonable with respect to your mean_traffic. 
+        Pick something reasonable with respect to your mean_traffic.
         Default is 100
     :param temporal_variance: Variance on the volume in time
     :return:
@@ -118,15 +118,15 @@ cpdef TrafficMatrix random_gravity_tm(int num_nodes, double mean_traffic):
 
 cpdef TrafficMatrix gravity_tm(populations, double total_traffic):
     """
-    Compute the gravity traffic matrix, based on node populations (sizes). 
+    Compute the gravity traffic matrix, based on node populations (sizes).
     The TM will have no randomness and only contains one epoch.
 
     ..note::
-        A possible way of generating populations is to sample from a 
+        A possible way of generating populations is to sample from a
         log-normal distribution
 
     :param populations: array/list with populations (weights) for each node
-    :param total_traffic: total volume of traffic in the network 
+    :param total_traffic: total volume of traffic in the network
         (will be divided among all ingres-egress pairs)
     :return: a new :py:class:`~TrafficMatrix`
     """
