@@ -4,6 +4,8 @@ import numpy
 cimport numpy
 from six.moves import cPickle  # for py 2/3 compat
 
+from tmgen.exceptions import TMgenException
+
 ctypedef enum EntryMode:
     ALL, MIN, MAX, MEAN
 
@@ -19,7 +21,7 @@ cdef EntryMode _mode_to_enum(str m):
     elif m == 'mean' or m == 'average':
         return MEAN
     else:
-        raise ValueError("Unknown entry choice mode")
+        raise TMgenException("Unknown entry choice mode")
 
 cdef class TrafficMatrix:
     """
@@ -35,11 +37,12 @@ cdef class TrafficMatrix:
             always n x n.
         """
         if not tm.ndim == 3:  # 2d + time
-            raise ValueError('Traffic matrix must have 3 dimensions: n x n x m,'
-                             'where n is number of nodes and m is number of '
-                             'epochs (at least 1)')
+            raise TMgenException(
+                'Traffic matrix must have 3 dimensions: n x n x m,'
+                'where n is number of nodes and m is number of '
+                'epochs (at least 1)')
         if not tm.shape[0] == tm.shape[1]:  # num_nodes both ways
-            raise ValueError(
+            raise TMgenException(
                 'First two dimentions of the traffic matrix must match')
         self.matrix = tm
 

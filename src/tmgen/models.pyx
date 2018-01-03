@@ -3,10 +3,8 @@ from __future__ import division
 
 cimport numpy
 import numpy
-from cpython cimport bool
 from six.moves import range
 from tmgen.exceptions import TMgenException
-from tmgen.hmc cimport hmc_exact
 from tmgen.tm cimport TrafficMatrix
 
 cdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
@@ -22,7 +20,7 @@ cdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
     Note that if the mean m is 0, then
     :math:`x = peakmean*sin(2*\pi*freq*linspace(0,1,N))`
 
-    Intervals of x below the mean have a drawdown determined by troughmean.
+    Intervals of x below the mean have a drawdown determined by trough_to_mean.
 
     ..note
         the trough-to-mean ratio must be less than or equal to the
@@ -57,81 +55,8 @@ cdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
         if trough_to_mean == 1:
             return x  # no effect on trough
         y = mean * (trough_to_mean - 1) * base + mean
-        x[x < mean] = y[y < mean]
+        x[x < mean] = y[x < mean]
     return x
-
-cdef tuple _modulated_gravity(numpy.ndarray mean_row, numpy.ndarray mean_col,
-                              numpy.ndarray modulated_total,
-                              double sigmasq,
-                              double sigmasq_temporal=numpy.nan,
-                              bool only_gravity=False):
-    if numpy.isnan(sigmasq_temporal):
-        sigmasq_temporal = sigmasq
-
-    if numpy.min(mean_row) < 0:
-        raise TMgenException('Row means must be non-negative')
-
-    if numpy.min(mean_col) < 0:
-        raise TMgenException('Column means must be non-negative')
-
-    cdef int num_nodes = mean_row.size
-    if not num_nodes == mean_col.size:
-        raise TMgenException('Column means length mismatch to row means length')
-
-    if sigmasq < 0 or sigmasq_temporal < 0:
-        raise TMgenException('Noise variance must be non-negative')
-
-    if numpy.min(modulated_total) < 0:
-        raise TMgenException('Total traffic must be non-negative')
-
-    # Setup necessary auxiliary parameters: number of TMs to generate and the
-    # mean of the total traffic from the modulated_mean total traffic signal
-    cdef int num_tms = modulated_total.size
-    cdef double mean_total = numpy.mean(modulated_total)
-
-    # average fanout
-    cdef numpy.ndarray pu = mean_row / mean_total
-    cdef numpy.ndarray pv = mean_col / mean_total
-
-    # Synthesize
-    # generate truncated normal random variables: we generate two samples
-    # each time because hmc_exact needs to burn-in
-    cdef numpy.ndarray u = hmc_exact(numpy.eye(num_nodes),
-                                     numpy.zeros(num_nodes),
-                                     numpy.eye(
-                                         num_nodes) * sigmasq / mean_total ** 2,
-                                     pu, True, 2, pu)
-    cdef numpy.ndarray v = hmc_exact(numpy.eye(num_nodes),
-                                     numpy.zeros(num_nodes),
-                                     numpy.eye(
-                                         num_nodes) * sigmasq / mean_total ** 2,
-                                     pv, True, 2, pv)
-    # print(u, v)
-    cdef numpy.ndarray normalized_mean = modulated_total / mean_total
-
-    # gravity model
-    gravity_model = mean_total * numpy.matmul(numpy.asmatrix(u[:, 1]).T,
-                                              *numpy.asmatrix(v[:, 1]))
-    if only_gravity:
-        return gravity_model
-
-    # modulate mean with modulated_mean reference total
-    cdef numpy.ndarray modulated_mean = \
-        hmc_exact(numpy.eye(num_tms),
-                  numpy.zeros(num_tms),
-                  numpy.eye(num_tms) * sigmasq_temporal / mean_total ** 2,
-                  normalized_mean.T,
-                  True, 2, normalized_mean.T)
-
-    # construct modulated_mean gravity model
-    # in 3D array form
-    cdef numpy.ndarray traffic_matrix = numpy.matmul(
-        numpy.reshape(gravity_model, (num_nodes ** 2, 1)),
-        numpy.asmatrix(modulated_mean[:, 1]))
-    # print(traffic_matrix.shape[0], traffic_matrix.shape[1])
-    traffic_matrix = numpy.reshape(numpy.asarray(traffic_matrix),
-                                   (num_nodes, num_nodes, num_tms))
-    return traffic_matrix, gravity_model
 
 cpdef TrafficMatrix modulated_gravity_tm(int num_nodes, int num_tms,
                                          double mean_traffic,
@@ -153,42 +78,26 @@ cpdef TrafficMatrix modulated_gravity_tm(int num_nodes, int num_tms,
         if you are generating multi-day TMs
     :param spatial_variance: Variance on the volume of traffic between
         origin-destination pairs.
-        Pick someting reasonable with respect to your mean_traffic. Default is 100
+        Pick something reasonable with respect to your mean_traffic. 
+        Default is 100
     :param temporal_variance: Variance on the volume in time
     :return:
     """
 
     # generate total traffic
-    cdef numpy.ndarray total_traffic = _peak_mean_cycle(diurnal_freq, num_tms,
-                                                        mean_traffic, pm_ratio,
-                                                        t_ratio)
-    if numpy.min(total_traffic) < 0:
+    cdef numpy.ndarray sinusoid = _peak_mean_cycle(diurnal_freq, num_tms,
+                                                   mean_traffic, pm_ratio,
+                                                   t_ratio)
+    if numpy.min(sinusoid) < 0:
         # rescale
-        total_traffic = total_traffic + numpy.absolute(numpy.min(total_traffic))
-        mean_traffic = numpy.mean(total_traffic)
-    # print('total traffic', total_traffic)
-    # print('mean traffic', mean_traffic)
+        sinusoid = sinusoid + numpy.absolute(numpy.min(sinusoid))
+        mean_traffic = numpy.mean(sinusoid)
 
-    # randomly generate incoming and outgoing total PoP traffic
-    # here we take the ratio of uniform random variables which turns out to be
-    # equivalent to a Beta distribution
-    # outgoing
-    fraction = numpy.random.rand(num_nodes)
-    fraction = fraction / (numpy.sum(fraction))
-    mean_row = fraction * mean_traffic
-    # print ('mean_row', mean_row)
-
-    # incoming
-    # fraction = numpy.random.rand(num_nodes)
-    fraction = fraction / (numpy.sum(fraction))
-    mean_col = fraction * mean_traffic
-
-    # note: rank of G must be 1
-    (traffic_matrix, g) = _modulated_gravity(mean_row, mean_col, total_traffic,
-                                             spatial_variance,
-                                             temporal_variance)
-    return TrafficMatrix(traffic_matrix)
-    # print(traffic_matrix.shape)
+    base_random_gravity_tm = random_gravity_tm(num_nodes,
+                                               mean_traffic / num_nodes)
+    tm = numpy.concatenate(
+        [base_random_gravity_tm.matrix * x for x in sinusoid], axis=2)
+    return TrafficMatrix(tm)
 
 cpdef TrafficMatrix random_gravity_tm(int num_nodes, double mean_traffic):
     """
@@ -209,19 +118,22 @@ cpdef TrafficMatrix random_gravity_tm(int num_nodes, double mean_traffic):
 
 cpdef TrafficMatrix gravity_tm(populations, double total_traffic):
     """
-    Compute the gravity traffic matrix, based on node populations. The TM will have no randomness
-    and only contains one epoch.
+    Compute the gravity traffic matrix, based on node populations (sizes). 
+    The TM will have no randomness and only contains one epoch.
 
     ..note::
-        A possible way of generation populations is to sample from a log-normal distribution
+        A possible way of generating populations is to sample from a 
+        log-normal distribution
 
-    :param populations: array/list with populations (weights) for each PoP
-    :param total_traffic: total volume of traffic in the network (will be divided among all ingres-egress pairs)
+    :param populations: array/list with populations (weights) for each node
+    :param total_traffic: total volume of traffic in the network 
+        (will be divided among all ingres-egress pairs)
     :return: a new :py:class:`~TrafficMatrix`
     """
     if not isinstance(populations, numpy.ndarray):
         populations = numpy.array(populations)
-    assert populations.ndim == 1
+    if populations.ndim != 1:
+        raise TMgenException('Expected populations to be 1-d numpy array')
     cdef int num_nodes = populations.size
     res = numpy.zeros((num_nodes, num_nodes))
     cdef double denom = populations.sum() ** 2
