@@ -41,9 +41,9 @@ Generating a traffic matrix
 
 Lets generate a uniform traffic matrix for a network with 3 nodes:
 
-  >>> from tmgen import uniform_tm
+  >>> from tmgen.models import uniform_tm
   >>> tm = uniform_tm(3, 100, 300)
-  >>> print tm
+  >>> print(tm)
   array([[[ 219.73016387],
         [ 161.41332385],
         [ 120.68272977]],
@@ -63,10 +63,10 @@ Accessing tm entries
 TMgen gives you a number of ways to access the TM values. Lets generate an
 exponential TM with the mean volume of 500 and 2 time epochs.
 
-  >>> from tmgen import exp_tm
+  >>> from tmgen.models import exp_tm
   >>> tm = exp_tm(3, 500, 2)
 
-Accessing the *matrix* attrbute gives us the underlying Numpy array:
+Accessing the *matrix* attribute gives us the underlying Numpy array:
 
   >>> tm.matrix
   array([[[  6.37997965e+02,   1.09182535e+02],

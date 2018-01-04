@@ -11,7 +11,7 @@ convenience.
 ## Supported TM models
 
 - [x] Random Gravity Model
-- [x] Modulated Gravity Model
+- [x] Modulated Random Gravity Model
 - [x] Non-stationary Conditionally Independent Model
 - [x] Spike Model
 - [x] Gravity Model
