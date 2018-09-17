@@ -46,6 +46,7 @@ setup(
         'plotting': ['matplotlib', 'seaborn'],
     },
     tests_require=['pytest', 'flake8'],
+    setup_requires=['pytest-runner'],
     ext_modules=cythonize(extensions),
     package_data={
         'tmgen': ['*.pxd'],
