@@ -15,10 +15,10 @@ cdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
     peak-to-mean ratio, and trough_to_mean ratio.
 
     The generated signal has the form
-    :math:`x = mean*(peaktomean-1)*sin(2*\pi*freq*linspace(0,1,N))+mean`
+    :math:`x = mean*(peaktomean-1)*sin(2*\\pi*freq*linspace(0,1,N))+mean`
 
     Note that if the mean m is 0, then
-    :math:`x = peakmean*sin(2*\pi*freq*linspace(0,1,N))`
+    :math:`x = peakmean*sin(2*\\pi*freq*linspace(0,1,N))`
 
     Intervals of x below the mean have a drawdown determined by trough_to_mean.
 
@@ -39,8 +39,8 @@ cdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
         raise TMgenException(
             'Peak-to-mean ratio must be greater than or equal to 1')
     # Generate the basic sinusoid
-    cdef numpy.ndarray base = numpy.sin(2 * numpy.pi * freq *
-                                        numpy.linspace(0, n - 1, n))
+    cdef numpy.ndarray base = numpy.sin(
+        2 * numpy.pi * freq * numpy.linspace(0, n - 1, n))
     # If mean is 0, simply return scaled sinusoid
     if mean == 0:
         return peak_to_mean * base
