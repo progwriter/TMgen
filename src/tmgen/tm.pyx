@@ -105,7 +105,7 @@ cdef class TrafficMatrix:
         Returns a new traffic matrix that is the average across all epochs.
 
         """
-        return TrafficMatrix(numpy.reshape(self.matrix.max(axis=2),
+        return TrafficMatrix(numpy.reshape(self.matrix.mean(axis=2),
                                            (self.num_nodes(), self.num_nodes(),
                                             1)))
 
