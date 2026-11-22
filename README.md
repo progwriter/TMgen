@@ -38,3 +38,9 @@ To Paul Tune, Matthew Roughan, and Ari Pakman for their work in this space and
 for making their code available. This code is an adaptation of their Matlab
 versions [MaxEnt](https://github.com/ptuls/MaxEntTM) and
 [HMC](https://github.com/aripakman/hmc-tmg)
+
+## Development
+
+Contributions are welcome. See [DEVELOPMENT.md](DEVELOPMENT.md) for how to set
+up a development environment, run the checks and submit changes, and
+[CHANGELOG.md](CHANGELOG.md) for release notes.

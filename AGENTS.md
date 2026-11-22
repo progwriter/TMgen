@@ -11,6 +11,8 @@ TMgen generates network traffic matrices. Python 3.11+, with Cython extensions.
 
 ## Setup and checks
 
+`DEVELOPMENT.md` is the human-facing version of this section and the commit rules; keep them consistent.
+
 ```
 uv venv && uv pip install -e '.[dev]'
 uv pip install -e .   # rebuild after editing .pyx
