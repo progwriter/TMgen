@@ -65,3 +65,12 @@ mypy_path = "src"
 [[tool.mypy.overrides]]
 module = ["matplotlib.*", "seaborn.*"]
 ignore_missing_imports = true
+
+[tool.cibuildwheel]
+build = "cp311-* cp312-* cp313-* cp314-* cp315-*"
+skip = "*-musllinux_* *-win32 *_i686"
+test-requires = "pytest"
+test-command = "pytest {project}/tests"
+
+[tool.cibuildwheel.macos]
+archs = ["x86_64", "arm64"]
