@@ -1,15 +1,17 @@
+from pathlib import Path
+
 import numpy
 import pytest
 
 from tmgen import TrafficMatrix
 
 
-def test_empty_constructor():
+def test_empty_constructor() -> None:
     with pytest.raises(TypeError):
-        TrafficMatrix()
+        TrafficMatrix()  # type: ignore[call-arg]
 
 
-def test_mean_and_worst_case():
+def test_mean_and_worst_case() -> None:
     m = numpy.stack([numpy.ones((2, 2)), 3 * numpy.ones((2, 2))], axis=2)
     tm = TrafficMatrix(m)
     assert (tm.mean().matrix == 2).all()
@@ -17,7 +19,7 @@ def test_mean_and_worst_case():
 
 
 @pytest.mark.parametrize("epochs", [1, 3])
-def test_csv_shape(tmp_path, epochs):
+def test_csv_shape(tmp_path: Path, epochs: int) -> None:
     tm = TrafficMatrix(numpy.random.rand(2, 2, epochs))
     f = tmp_path / "tm.csv"
     tm.to_csv(str(f))

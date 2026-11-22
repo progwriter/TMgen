@@ -5,7 +5,7 @@ from tmgen.hmc import hmc_sample
 
 
 @pytest.mark.parametrize("covariance", [True, False])
-def test_hmc_truncated_gaussian(covariance):
+def test_hmc_truncated_gaussian(covariance: bool) -> None:
     # standard 2d gaussian restricted to x >= 0 (f = I, g = 0)
     numpy.random.seed(0)
     xs = hmc_sample(
