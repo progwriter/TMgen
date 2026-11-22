@@ -24,8 +24,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-      - run: pip install pytest ruff mypy
-      - run: pip install -e .
+      - run: pip install -e ".[dev]"
       - run: ruff check
       - run: ruff format --check
       - run: mypy

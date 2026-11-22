@@ -27,7 +27,7 @@ Homepage = "https://github.com/progwriter/TMgen"
 [project.optional-dependencies]
 plotting = ["matplotlib", "seaborn"]
 test = ["pytest"]
-dev = ["pytest", "ruff", "mypy"]
+dev = ["pytest", "ruff", "mypy", "matplotlib", "seaborn"]
 
 [project.scripts]
 tmditg = "tmgen.inject.ditg_injector:main"
