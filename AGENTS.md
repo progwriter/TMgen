@@ -7,7 +7,7 @@ TMgen generates network traffic matrices. Python 3.11+, with Cython extensions.
 - `src/tmgen/models.pyx`, `tm.pyx`, `hmc.pyx`: compiled modules. Hand-written stubs (`*.pyi`) next to them define the typed public API; `*.pxd` declare the Cython interface.
 - `src/tmgen/plot.py`, `inject/`: pure Python.
 - `tests/`, `docs/` (Sphinx; `docs/quickstart.rst` doctests run under pytest).
-- `PLAN.md`, `API_CRITIQUE.md`: local, untracked notes. Never commit them. Keep `PLAN.md` current as work lands.
+- `agentdocs/` (git-ignored): local notes such as `PLAN.md` and `API_CRITIQUE.md`. Never commit them. Keep `agentdocs/PLAN.md` current as work lands.
 
 ## Setup and checks
 

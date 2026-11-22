@@ -67,3 +67,6 @@ MANIFEST
 
 # PyCharm folder
 .idea
+
+# Local agent notes (plans, critiques); never committed
+agentdocs/
