@@ -36,26 +36,29 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
     :return: 
         a :math:`d \times num_samples` matrix where each column is a sample
     """
-    assert g.ndim == 1
-    if not f.shape[0] != g.size:
+    if g.ndim != 1:
+        raise ValueError('g must be a vector')
+    if f.shape[0] != g.size:
         raise ValueError('First dimension of f and g must match')
 
-    cdef numpy.ndarray mu, temp_r
-    cdef numpy.ndarray r = cholesky(m)
+    # work on copies, the caller's arrays must not be modified
+    g = g.copy()
+    initial_x = initial_x.astype(numpy.float64, copy=True)
+
+    cdef numpy.ndarray mu
+    # numpy's cholesky is lower triangular (m = lower @ lower.T), the
+    # reference Matlab implementation uses the upper factor (lower.T)
+    cdef numpy.ndarray lower = cholesky(m)
     if covariance:
         mu = mu_r
         g += numpy.matmul(f, mu)
-        f = numpy.matmul(f, r.T)
-        initial_x -= mu
-        initial_x = _mldivide(r.T, initial_x)
+        f = numpy.matmul(f, lower)
+        initial_x = _mldivide(lower, initial_x - mu)
     else:
-        # raise NotImplementedError("Non-covariance constraints are not yet implemented")
-        r = cholesky(m)
-        mu = _mldivide(r, _mldivide(r.T, mu_r))
+        mu = _mldivide(lower.T, _mldivide(lower, mu_r))
         g += numpy.matmul(f, mu)
-        f = numpy.matmul(r, numpy.linalg.inverse(f))
-        initial_x = initial_x - mu
-        initial_x = numpy.matmul(r, initial_x)
+        f = _mrdivide(f, lower.T)
+        initial_x = numpy.matmul(lower.T, initial_x - mu)
 
     cdef int d = initial_x.shape[0]
     cdef int bounce_count = 0
@@ -67,7 +70,7 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
         raise ValueError('Error: Initial condition violates the constraints')
 
     # squared norm of the rows of F, needed for reflecting the velocity
-    cdef numpy.ndarray f2 = numpy.sum(f * f, axis=2)
+    cdef numpy.ndarray f2 = numpy.sum(f * f, axis=1)
 
     ## Sampling loop
     cdef numpy.ndarray last_x = initial_x
@@ -82,7 +85,7 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
     cdef double move_time, tt, tt1, qj = 0
     while i < num_samples:
         stop = 0
-        j = 0
+        j = -1  # index of the last wall hit, -1 if none yet
         v0 = numpy.random.randn(d)  # initial velocity
         x = last_x
 
@@ -105,7 +108,7 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
 
             # find the first time constraint becomes zero
             if numpy.any(pn):
-                inds = div_result <= 1
+                inds = numpy.flatnonzero(pn)
                 phn = phi[pn]
                 t1 = -phn + numpy.arccos(
                     -g[pn] / u[pn])  # time at which coordinates hit the walls
@@ -115,10 +118,10 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
                 # if there was a previous reflection (j>0)
                 # and there is a potential reflection at the sample plane
                 # make sure that a new reflection at j is not found because of numerical error
-                if j > 0:
+                if j >= 0:
                     if pn[j]:
                         cs = numpy.cumsum(pn)
-                        indj = cs[j]
+                        indj = cs[j] - 1
                         tt1 = t1[indj]
                         if numpy.absolute(tt1) < near_zero or numpy.absolute(
                                         tt1 - 2 * numpy.pi) < near_zero:
@@ -147,8 +150,8 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
                 break
 
             # compute reflected velocity
-            qj = numpy.matmul(f[j, :], v) / f2[j]
-            v0 = v - 2 * qj * f.T[:, j]
+            qj = numpy.dot(f[j, :], v) / f2[j]
+            v0 = v - 2 * qj * f[j, :]
             bounce_count += 1
 
         # at this point we have a sampled value X, but due to possible
@@ -164,8 +167,8 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
 
     # transform back to the unwhitened frame
     if covariance:
-        result_xs = numpy.matmul(r.T, result_xs) + numpy.tile(mu, (1, num_samples)).T
+        result_xs = numpy.matmul(lower, result_xs) + mu[:, None]
     else:
-        result_xs = numpy.linalg.solve(r, result_xs) + numpy.tile(mu, (1, num_samples)).T
+        result_xs = _mldivide(lower.T, result_xs) + mu[:, None]
 
     return result_xs
