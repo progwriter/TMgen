@@ -18,8 +18,8 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-      - run: pip install pytest flake8
+      - run: pip install pytest ruff
       - run: pip install -e .
-      - run: flake8
-      - run: flake8 --config .flake8.cython
+      - run: ruff check
+      - run: ruff format --check
       - run: pytest tests/
