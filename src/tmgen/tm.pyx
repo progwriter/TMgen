@@ -95,10 +95,11 @@ cdef class TrafficMatrix:
             Each row is a single epoch with a flattened array of ingress-egress nodes.
         """
         if self.num_epochs() > 1:
-            m = self.matrix.reshape((self.num_nodes() ** 2, self.num_epochs()))
+            m = self.matrix.reshape(
+                (self.num_nodes() ** 2, self.num_epochs())).T
             numpy.savetxt(fname, m, delimiter=',')
         else:
-            numpy.savetxt(fname, self.matrix, delimiter=',')
+            numpy.savetxt(fname, self.matrix[:, :, 0], delimiter=',')
 
     cpdef TrafficMatrix mean(self):
         """
