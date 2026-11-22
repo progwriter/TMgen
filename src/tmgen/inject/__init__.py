@@ -1,12 +1,17 @@
-from abc import ABCMeta, abstractmethod
+import os
+from abc import ABC, abstractmethod
 
 from tmgen import TrafficMatrix
 
 
-class InjectorBase:
-    __metaclass__ = ABCMeta
-
-    def __init__(self, tm_fname, epoch_length, ID, destinations):
+class InjectorBase(ABC):
+    def __init__(
+        self,
+        tm_fname: str | os.PathLike[str],
+        epoch_length: float,
+        ID: int,
+        destinations: dict[str, list[str]],
+    ) -> None:
         """
         Create a new traffic injector
 
@@ -22,7 +27,7 @@ class InjectorBase:
         self.destinations = destinations
         self._load_tm(tm_fname)
 
-    def _load_tm(self, tm_fname):
+    def _load_tm(self, tm_fname: str | os.PathLike[str]) -> None:
         """
         Load the traffic matrix from disk
         :param tm_fname: the TM fileame (file must be in pickle format)
@@ -30,5 +35,5 @@ class InjectorBase:
         self.tm = TrafficMatrix.from_pickle(tm_fname)
 
     @abstractmethod
-    def run(self):
+    def run(self) -> None:
         pass
