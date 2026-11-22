@@ -1,5 +1,7 @@
 import warnings
 
+from tmgen.tm import TrafficMatrix
+
 try:
     import seaborn
 
@@ -18,7 +20,7 @@ except ImportError as e:
     raise e
 
 
-def heatmap(tm, epoch=None):
+def heatmap(tm: TrafficMatrix, epoch: int | None = None) -> None:
     """
     Plot the traffic matrix as a heatmap using matplotlib.
     If epoch is given or traffic matrix has a single epoch then the graph is a
@@ -67,7 +69,7 @@ def heatmap(tm, epoch=None):
         plt.ylabel("Ingress-egress pair")
 
 
-def timeseries(tm):
+def timeseries(tm: TrafficMatrix) -> None:
     """
     Plot the traffic matrix as timeseries. With epochs on the x-axis and volume
     of the y-axis each line represents a single OD pair.
