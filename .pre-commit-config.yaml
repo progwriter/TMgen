@@ -1,0 +1,32 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.6
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+  - repo: local
+    hooks:
+      # Runs the project's own mypy so it sees numpy, as in CI
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        types_or: [python, pyi]
+        pass_filenames: false
+      # Fails on Sphinx warnings, so doc breakage is caught before CI
+      - id: docs
+        name: sphinx docs
+        entry: python -m sphinx -W -q -b html docs docs/_build
+        language: system
+        files: ^(docs/|src/tmgen/.*\.(py|pyx|pyi)$)
+        pass_filenames: false
