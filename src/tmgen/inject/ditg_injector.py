@@ -2,6 +2,8 @@
 
 # coding=utf-8
 
+from __future__ import annotations
+
 import argparse
 import json
 import signal
@@ -9,12 +11,15 @@ import sys
 import time
 from math import ceil
 from subprocess import Popen
+from types import FrameType
 
 from tmgen.inject import InjectorBase
 
+injector: DITGinjector | None = None
 
-def interrupt_handler(sig, frame):
-    if sig == signal.SIGINT:
+
+def interrupt_handler(sig: int, frame: FrameType | None) -> None:
+    if sig == signal.SIGINT and injector is not None:
         injector.stop()
 
 
@@ -31,21 +36,30 @@ class DITGinjector(InjectorBase):
     """
 
     def __init__(
-        self, tm_fname, epoch_length, ID, destinations, port, sig_port, scale_factor=1
-    ):
+        self,
+        tm_fname: str,
+        epoch_length: float,
+        ID: int,
+        destinations: dict[str, list[str]],
+        port: int,
+        sig_port: int,
+        scale_factor: float = 1,
+    ) -> None:
         super().__init__(tm_fname, epoch_length, ID, destinations)
         self.recv_exec = "ITGRecv"
         self.send_exec = "ITGSend"
         self.port = port
         self.sig_port = sig_port
         self.scale_factor = scale_factor
+        self._receiver_process: Popen[bytes] | None = None
+        self._send_processes: list[Popen[bytes]] = []
 
-    def _start_receiver(self):
+    def _start_receiver(self) -> Popen[bytes]:
         """Starts a single receiver"""
         self._receiver_process = Popen([self.recv_exec, "-Sp", str(self.sig_port)])
         return self._receiver_process
 
-    def _start_senders(self, e):
+    def _start_senders(self, e: int) -> None:
         """
         Start multiple senders at each epoch
         :return:
@@ -86,7 +100,7 @@ class DITGinjector(InjectorBase):
             for p in self._send_processes:
                 p.wait()
 
-    def run(self):
+    def run(self) -> None:
         """Execute the injection"""
         num_epochs = self.tm.num_epochs()
         for e in range(num_epochs):
@@ -101,14 +115,15 @@ class DITGinjector(InjectorBase):
             r.send_signal(signal.SIGINT)
             r.wait()
 
-    def stop(self):
+    def stop(self) -> None:
         print("Stopping the injector")
         for p in self._send_processes:
             p.terminate()
-        self._receiver_process.terminate()
+        if self._receiver_process is not None:
+            self._receiver_process.terminate()
 
 
-def main():
+def main() -> None:
     global injector
     parser = argparse.ArgumentParser()
     parser.add_argument("--tm", help="The traffic matrix filename", required=True)
