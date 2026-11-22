@@ -36,6 +36,7 @@ Gotchas:
 - Prefer `attrs` for data classes, `argparse` with named arguments for scripts, and `logging` over `print`.
 - Comments only for non-obvious why, never how or history. Update a comment when you change the code it explains.
 - Update README, docs, stubs and tests together with behavior changes.
+- Add a `CHANGELOG.md` entry under **Unreleased** for every user-visible change (new features, behavior changes, fixes, removals), in the same commit.
 
 ## Commits
 
