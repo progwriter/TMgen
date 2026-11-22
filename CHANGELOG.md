@@ -36,6 +36,8 @@ time, rename that section to the new version and date (see `RELEASING.md`).
   Cholesky factor, mutated its inputs).
 - The D-ITG injector's SIGINT handler raised `NameError`.
 - Importing `tmgen.plot` without seaborn raised `TypeError`.
+- `tmgen.plot.heatmap` raised `NameError` when seaborn was not installed; it
+  now falls back to plain matplotlib.
 - `InjectorBase.run` was never enforced as abstract.
 
 ### Removed

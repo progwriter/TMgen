@@ -1,12 +1,18 @@
+import importlib
 import warnings
+from types import ModuleType
+
+import numpy as np
+from numpy.typing import NDArray
 
 from tmgen.tm import TrafficMatrix
 
+seaborn: ModuleType | None
 try:
-    import seaborn
-
+    seaborn = importlib.import_module("seaborn")
     seaborn.set(style="white")
 except ImportError:
+    seaborn = None
     warnings.warn(
         "Please consider installing seaborn package for prettier graphs",
         stacklevel=2,
@@ -18,6 +24,11 @@ except ImportError as e:
         "Plotting functionality requires the matplotlib library", stacklevel=2
     )
     raise e
+
+
+def _matplotlib_heatmap(matrix: NDArray[np.float64]) -> None:
+    plt.imshow(matrix, cmap="viridis", aspect="auto")
+    plt.colorbar()
 
 
 def heatmap(tm: TrafficMatrix, epoch: int | None = None) -> None:
@@ -59,12 +70,20 @@ def heatmap(tm: TrafficMatrix, epoch: int | None = None) -> None:
             matrix = tm.matrix.reshape((n * n, tm.num_epochs()))
             reshaped = True
     if not reshaped:
-        seaborn.heatmap(matrix, cmap="viridis")
+        if seaborn is not None:
+            seaborn.heatmap(matrix, cmap="viridis")
+        else:
+            _matplotlib_heatmap(matrix)
         plt.xlabel("Node")
         plt.ylabel("Node")
         plt.title(f"Volume at epoch {epoch if epoch is not None else 0}")
     else:
-        seaborn.heatmap(matrix, xticklabels=max(tm.num_epochs() / 10, 1), yticklabels=n)
+        if seaborn is not None:
+            seaborn.heatmap(
+                matrix, xticklabels=max(tm.num_epochs() / 10, 1), yticklabels=n
+            )
+        else:
+            _matplotlib_heatmap(matrix)
         plt.xlabel("Time (epochs)")
         plt.ylabel("Ingress-egress pair")
 
