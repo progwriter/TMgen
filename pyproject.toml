@@ -32,6 +32,7 @@ dev = [
     "ruff",
     "mypy",
     "pre-commit",
+    "pytest-benchmark",
     "matplotlib",
     "seaborn",
     "sphinx",
@@ -68,7 +69,7 @@ doctest_optionflags = "NORMALIZE_WHITESPACE ALLOW_UNICODE ALLOW_BYTES"
 
 [tool.mypy]
 strict = true
-files = ["src", "tests", "tools"]
+files = ["src", "tests", "tools", "benchmarks"]
 mypy_path = "src"
 
 [[tool.mypy.overrides]]

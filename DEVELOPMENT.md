@@ -62,6 +62,21 @@ The pre-commit hooks cover everything above except `pytest`. Notes:
 - A `package` CI job builds the sdist and wheel and imports the installed
   wheel, so packaging mistakes show up before a release.
 
+## Benchmarks
+
+`benchmarks/` holds [pytest-benchmark](https://pytest-benchmark.readthedocs.io/)
+suites for the models and the HMC sampler. They are not collected by a plain
+`pytest`; run them explicitly:
+
+```
+pytest benchmarks --benchmark-only
+pytest benchmarks --benchmark-only --benchmark-save=before   # save a baseline
+pytest benchmarks --benchmark-only --benchmark-compare=0001  # compare to it
+```
+
+Run them on an otherwise idle machine and compare numbers only on the same
+machine.
+
 ## Documentation
 
 The docs are Sphinx pages in `docs/` and are also published on Read the Docs.
