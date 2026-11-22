@@ -1,0 +1,163 @@
+name: Release
+
+# Pushing a v* tag builds everything, publishes to TestPyPI, smoke-tests the
+# upload, then waits for manual approval of the `pypi` environment before
+# publishing to PyPI and creating the GitHub release.
+# Running it by hand from the Actions tab only builds (a dry run).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Release only from commits on the default branch
+        if: github.ref_type == 'tag'
+        run: |
+          git fetch origin "${{ github.event.repository.default_branch }}"
+          git merge-base --is-ancestor "$GITHUB_SHA" "origin/${{ github.event.repository.default_branch }}"
+      - name: Extract release notes from CHANGELOG.md
+        if: github.ref_type == 'tag'
+        run: python tools/release_notes.py extract --version "$GITHUB_REF_NAME" > release-notes.md
+      - uses: actions/upload-artifact@v4
+        if: github.ref_type == 'tag'
+        with:
+          name: release-notes
+          path: release-notes.md
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build twine
+      - run: python -m build --sdist
+      - run: twine check --strict dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-sdist
+          path: dist/*.tar.gz
+
+  wheels:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pypa/cibuildwheel@v4.3.5
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
+
+  testpypi:
+    if: github.ref_type == 'tag'
+    needs: [verify, sdist, wheels]
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/tmgen
+    permissions:
+      id-token: write # trusted publishing, no API tokens
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+  smoke-test:
+    if: github.ref_type == 'tag'
+    needs: testpypi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the tagged version from TestPyPI
+        run: |
+          python -m venv venv
+          version="${GITHUB_REF_NAME#v}"
+          # the index can lag a little behind the upload
+          for attempt in 1 2 3 4 5 6 7 8; do
+            if venv/bin/pip install --index-url https://test.pypi.org/simple/ \
+                --extra-index-url https://pypi.org/simple/ "tmgen==$version"; then
+              break
+            fi
+            [ "$attempt" = 8 ] && exit 1
+            sleep 15
+          done
+          venv/bin/python - <<EOF
+          import tmgen
+          from tmgen.models import exp_tm
+
+          assert tmgen.__version__ == "$version", tmgen.__version__
+          assert exp_tm(3, 1.0).matrix.shape == (3, 3, 1)
+          EOF
+
+  pypi:
+    needs: smoke-test
+    runs-on: ubuntu-latest
+    # Configure required reviewers on this environment: the approval click is
+    # the "release to real PyPI" button.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/tmgen
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    needs: pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "{dist-*,release-notes}"
+          merge-multiple: true
+          path: assets
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # PEP 440 pre-releases (a, b, rc, dev) are marked as such
+          flags=""
+          if [[ "$GITHUB_REF_NAME" =~ [0-9](a|b|rc|\.dev)[0-9]* ]]; then flags="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" assets/*.whl assets/*.tar.gz \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --title "$GITHUB_REF_NAME" \
+            --notes-file assets/release-notes.md $flags
