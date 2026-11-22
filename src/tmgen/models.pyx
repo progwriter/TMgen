@@ -7,7 +7,7 @@ from six.moves import range
 from tmgen.exceptions import TMgenException
 from tmgen.tm cimport TrafficMatrix
 
-cdef numpy.ndarray _peak_mean_cycle(double freq, double n, double mean,
+cdef numpy.ndarray _peak_mean_cycle(double freq, int n, double mean,
                                     double peak_to_mean,
                                     double trough_to_mean=numpy.nan):
     """
@@ -221,7 +221,16 @@ cpdef TrafficMatrix spike_tm(int num_nodes, int num_spikes, double mean_spike,
 cpdef TrafficMatrix lognormal_tm(int num_nodes, double mean_traffic,
                                  double sigma=1,
                                  int num_epochs=1):
-    return TrafficMatrix(numpy.random.lognormal(mean_traffic, sigma=sigma,
+    """
+    Lognormal traffic matrix. Values are drawn from a lognormal distribution.
+
+    :param num_nodes: number of nodes in the network
+    :param mean_traffic: mean of the underlying normal distribution
+    :param sigma: standard deviation of the underlying normal distribution
+    :param num_epochs: number of epochs in the traffic matrix
+    :return: TrafficMatrix object
+    """
+    return TrafficMatrix(numpy.random.lognormal(mean=mean_traffic, sigma=sigma,
                                                 size=(num_nodes, num_nodes,
                                                       num_epochs)).clip(min=0))
 
@@ -240,4 +249,4 @@ cpdef TrafficMatrix exact_tm(int num_nodes, double val, int num_epochs=1):
     return TrafficMatrix(numpy.ones((num_nodes, num_nodes, num_epochs)) * val)
 
 __all__ = ['modulated_gravity_tm', 'random_gravity_tm', 'gravity_tm',
-           'uniform_tm', 'exp_tm', 'spike_tm', 'exact_tm']
+           'uniform_tm', 'exp_tm', 'spike_tm', 'exact_tm', 'lognormal_tm']
