@@ -18,6 +18,21 @@ changes need nothing.
 The package version comes from git tags (setuptools-scm), so an untagged
 checkout reports a `0.1.devN` version.
 
+## Pre-commit hooks
+
+The repository ships [pre-commit](https://pre-commit.com/) hooks: whitespace
+and file checks, `ruff check --fix`, `ruff format`, `mypy` and a strict Sphinx
+docs build. Enable them once per clone, from the activated environment:
+
+```
+pre-commit install
+```
+
+After that they run on every `git commit`. Run them on everything with
+`pre-commit run --all-files`. The `mypy` and docs hooks use the tools from your
+environment (not an isolated copy), so keep it activated and the extensions
+built. CI runs the same hooks.
+
 ## Layout
 
 - `src/tmgen/models.pyx`, `tm.pyx`, `hmc.pyx`: the compiled modules.
@@ -38,7 +53,7 @@ mypy                    # strict, covers src, tests and tools
 pytest                  # tests plus the docs/ doctests
 ```
 
-Notes:
+The pre-commit hooks cover everything above except `pytest`. Notes:
 
 - Ruff sorts imports differently depending on whether the extensions are
   built, so run it after `pip install -e ".[dev]"`, as CI does.
@@ -50,12 +65,13 @@ Notes:
 ## Documentation
 
 The docs are Sphinx pages in `docs/` and are also published on Read the Docs.
-To build them locally:
+The `dev` extra includes Sphinx. To build them locally:
 
 ```
-pip install sphinx sphinx_rtd_theme
-python -m sphinx -b html docs docs/_build
+python -m sphinx -W -b html docs docs/_build
 ```
+
+`-W` turns warnings into errors, as in the pre-commit hook and CI.
 
 ## Contributing changes
 

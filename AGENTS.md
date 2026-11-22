@@ -18,7 +18,7 @@ uv venv && uv pip install -e '.[dev]'
 uv pip install -e .   # rebuild after editing .pyx
 ```
 
-CI runs exactly these, and every commit should pass them:
+CI runs these (plus the pre-commit hooks in `.pre-commit-config.yaml`, which add whitespace checks and a strict Sphinx build, `python -m sphinx -W -b html docs docs/_build`), and every commit should pass them:
 
 ```
 ruff check
