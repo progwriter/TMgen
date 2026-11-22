@@ -4,12 +4,16 @@ try:
     import seaborn
     seaborn.set(style='white')
 except ImportError:
-    warnings.warn('Please consider installing searbon package for prettier graphs',
-                  category=ImportError)
+    warnings.warn(
+        'Please consider installing seaborn package for prettier graphs',
+        stacklevel=2,
+    )
 try:
     from matplotlib import pyplot as plt
 except ImportError as e:
-    warnings.warn('Plotting functionality requires the matplotlib library')
+    warnings.warn(
+        'Plotting functionality requires the matplotlib library', stacklevel=2
+    )
     raise e
 from six.moves import range
 
