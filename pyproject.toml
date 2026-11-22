@@ -59,7 +59,7 @@ doctest_optionflags = "NORMALIZE_WHITESPACE ALLOW_UNICODE ALLOW_BYTES"
 
 [tool.mypy]
 strict = true
-files = ["src", "tests"]
+files = ["src", "tests", "tools"]
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
