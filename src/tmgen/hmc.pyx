@@ -172,3 +172,18 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
         result_xs = _mldivide(lower.T, result_xs) + mu[:, None]
 
     return result_xs
+
+
+def hmc_sample(f, g, m, mu_r, initial_x, int num_samples, covariance=True):
+    """
+    Python-visible wrapper around :py:func:`hmc_exact`.
+    Samples a Gaussian subject to :math:`f x + g \\geq 0`.
+
+    :return: a :math:`d \\times num\\_samples` array, one sample per column
+    """
+    return hmc_exact(numpy.asarray(f, dtype=numpy.float64),
+                     numpy.asarray(g, dtype=numpy.float64),
+                     numpy.asarray(m, dtype=numpy.float64),
+                     numpy.asarray(mu_r, dtype=numpy.float64),
+                     bool(covariance), num_samples,
+                     numpy.asarray(initial_x, dtype=numpy.float64))
