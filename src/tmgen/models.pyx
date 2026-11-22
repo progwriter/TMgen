@@ -3,7 +3,6 @@ from __future__ import division
 
 cimport numpy
 import numpy
-from six.moves import range
 from tmgen.exceptions import TMgenException
 from tmgen.tm cimport TrafficMatrix
 

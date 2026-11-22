@@ -2,7 +2,7 @@
 
 import numpy
 cimport numpy
-from six.moves import cPickle  # for py 2/3 compat
+import pickle
 
 from tmgen.exceptions import TMgenException
 
@@ -83,7 +83,7 @@ cdef class TrafficMatrix:
         :param fname: the file name
         """
         with open(fname, 'wb') as f:
-            cPickle.dump(self.matrix, f)
+            pickle.dump(self.matrix, f)
 
     cpdef to_csv(self, fname):
         """
@@ -141,7 +141,7 @@ cdef class TrafficMatrix:
         :return: new TrafficMatrix
         """
         with open(fname, 'rb') as f:
-            return TrafficMatrix(cPickle.load(f))
+            return TrafficMatrix(pickle.load(f))
 
     def __repr__(self):
         return repr(self.matrix)

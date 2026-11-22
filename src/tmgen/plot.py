@@ -15,7 +15,6 @@ except ImportError as e:
         'Plotting functionality requires the matplotlib library', stacklevel=2
     )
     raise e
-from six.moves import range
 
 
 def heatmap(tm, epoch=None):
