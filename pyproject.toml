@@ -52,3 +52,12 @@ select = ["E", "F", "W", "I", "UP", "B"]
 testpaths = ["tests", "docs"]
 addopts = "--doctest-glob='*.rst'"
 doctest_optionflags = "NORMALIZE_WHITESPACE ALLOW_UNICODE ALLOW_BYTES"
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["matplotlib.*", "seaborn.*"]
+ignore_missing_imports = true
