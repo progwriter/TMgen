@@ -224,7 +224,8 @@ cpdef TrafficMatrix lognormal_tm(int num_nodes, double mean_traffic,
     Lognormal traffic matrix. Values are drawn from a lognormal distribution.
 
     :param num_nodes: number of nodes in the network
-    :param mean_traffic: mean of the underlying normal distribution
+    :param mean_traffic: mean (mu) of the underlying normal distribution,
+        *not* the mean of the resulting lognormal samples
     :param sigma: standard deviation of the underlying normal distribution
     :param num_epochs: number of epochs in the traffic matrix
     :return: TrafficMatrix object
