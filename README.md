@@ -12,15 +12,22 @@ convenience.
 
 - [x] Random Gravity Model
 - [x] Modulated Gravity Model
-- [x] Non-stationary Conditionally Independent Model
 - [x] Spike Model
 - [x] Gravity Model
-- [x] Uniform Model
+- [x] Uniform, Exponential, Lognormal and Exact (constant) Models
+
+The Max Entropy and non-stationary conditionally independent models from the
+paper are not yet exposed; only the underlying truncated-Gaussian HMC sampler
+(`tmgen.hmc.hmc_sample`) is implemented.
 
 ## Installation
 
-1. Install numpy and cython. (For example using `pip install numpy cython`)
-2. Run ``pip install .``
+Requires Python 3.11+ and a C compiler (numpy and cython are fetched
+automatically as build dependencies).
+
+```
+pip install .
+```
 
 ## Example Usage
 
