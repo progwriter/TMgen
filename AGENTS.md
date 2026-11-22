@@ -1,0 +1,44 @@
+# TMgen agent guide
+
+TMgen generates network traffic matrices. Python 3.11+, with Cython extensions.
+
+## Layout
+
+- `src/tmgen/models.pyx`, `tm.pyx`, `hmc.pyx`: compiled modules. Hand-written stubs (`*.pyi`) next to them define the typed public API; `*.pxd` declare the Cython interface.
+- `src/tmgen/plot.py`, `inject/`: pure Python.
+- `tests/`, `docs/` (Sphinx; `docs/quickstart.rst` doctests run under pytest).
+- `PLAN.md`, `API_CRITIQUE.md`: local, untracked notes. Never commit them. Keep `PLAN.md` current as work lands.
+
+## Setup and checks
+
+```
+uv venv && uv pip install -e '.[dev]'
+uv pip install -e .   # rebuild after editing .pyx
+```
+
+CI runs exactly these, and every commit should pass them:
+
+```
+ruff check
+ruff format --check
+mypy
+pytest            # tests + docs doctests, each in a temp dir (conftest.py)
+```
+
+Gotchas:
+
+- Ruff's import sorting depends on whether the extension is built, so run `ruff check` after building.
+- Ruff and mypy do not see `.pyx` files. When a `.pyx` signature changes, update its `.pyi` stub (and `.pxd`) by hand.
+
+## Code style
+
+- Annotate everything (mypy strict). Python 3.11 syntax (`X | None`, built-in generics).
+- Prefer `attrs` for data classes, `argparse` with named arguments for scripts, and `logging` over `print`.
+- Comments only for non-obvious why, never how or history. Update a comment when you change the code it explains.
+- Update README, docs, stubs and tests together with behavior changes.
+
+## Commits
+
+- Conventional Commits (`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`). Imperative, capitalized subject up to 50 characters, no trailing period; body wrapped at 72 explaining what and why.
+- Small, self-contained commits. Each must build and pass the checks above.
+- Fix up earlier unpushed commits with `git commit --fixup=<sha>` and autosquash later. Do not push, force-push or rewrite history unless the owner explicitly asks.
