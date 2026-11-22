@@ -19,6 +19,9 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,6 +34,28 @@ jobs:
         run: |
           git fetch origin "${{ github.event.repository.default_branch }}"
           git merge-base --is-ancestor "$GITHUB_SHA" "origin/${{ github.event.repository.default_branch }}"
+      - name: Require a green CI run for this commit
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The tag is usually pushed right after the merge, so CI may still be running
+          for attempt in $(seq 1 60); do
+            runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml \
+              --commit "$GITHUB_SHA" --json status,conclusion)
+            if [ "$(jq 'any(.[]; .conclusion == "success")' <<< "$runs")" = true ]; then
+              echo "CI passed for $GITHUB_SHA"
+              exit 0
+            fi
+            if [ "$(jq 'length > 0 and all(.[]; .status == "completed")' <<< "$runs")" = true ]; then
+              echo "CI did not succeed for $GITHUB_SHA: $runs"
+              exit 1
+            fi
+            echo "Waiting for CI (attempt $attempt)"
+            sleep 30
+          done
+          echo "Timed out waiting for CI"
+          exit 1
       - name: Extract release notes from CHANGELOG.md
         if: github.ref_type == 'tag'
         run: python tools/release_notes.py extract --version "$GITHUB_REF_NAME" > release-notes.md

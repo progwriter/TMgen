@@ -36,7 +36,9 @@ Releases are driven by git tags. The version comes from the tag
    ```
 
 4. Watch the **Release** workflow in the Actions tab. It will:
-   - verify the tag is on `master` and `CHANGELOG.md` has a `[0.2.0]` section;
+   - verify the tag is on `master`, CI is green for the tagged commit (it
+     waits up to 30 minutes for a running CI), and `CHANGELOG.md` has a
+     `[0.2.0]` section;
    - build the sdist and wheels (Linux x86_64 and arm64, macOS, Windows);
    - publish to TestPyPI and install the result in a clean environment;
    - **wait for approval** of the `pypi` environment.
