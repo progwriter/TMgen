@@ -1,5 +1,6 @@
 import numpy
 import pytest
+
 from tmgen.hmc import hmc_sample
 
 

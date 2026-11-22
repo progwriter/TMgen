@@ -39,7 +39,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-tmgen = ["*.pxd"]
+tmgen = ["*.pxd", "*.pyi", "py.typed"]
 
 [tool.ruff]
 target-version = "py311"
