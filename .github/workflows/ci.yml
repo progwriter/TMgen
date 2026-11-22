@@ -30,6 +30,24 @@ jobs:
       - run: mypy
       - run: pytest
 
+  pre-commit:
+    # Same hooks developers run locally, including the strict docs build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      - run: pre-commit run --all-files --show-diff-on-failure
+
   package:
     # Catch packaging problems on every push, not only when releasing
     runs-on: ubuntu-latest
