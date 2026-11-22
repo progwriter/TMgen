@@ -1,7 +1,5 @@
-# coding=utf-8
+from tmgen import models, tm
 
 from .tm import TrafficMatrix
-from tmgen import tm
-from tmgen import models
 
-__all__ = ['TrafficMatrix', 'models', 'plot', 'tm']
+__all__ = ["TrafficMatrix", "models", "plot", "tm"]

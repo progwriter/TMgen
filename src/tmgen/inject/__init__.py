@@ -1,10 +1,9 @@
-# coding=utf-8
-from abc import abstractmethod, ABCMeta
+from abc import ABCMeta, abstractmethod
 
 from tmgen import TrafficMatrix
 
 
-class InjectorBase(object):
+class InjectorBase:
     __metaclass__ = ABCMeta
 
     def __init__(self, tm_fname, epoch_length, ID, destinations):
@@ -15,7 +14,8 @@ class InjectorBase(object):
         :param epoch_length: length of a single epoch, in seconds
         :param ID: the integer ID of this injector
             (to determine correct flow volumes)
-        :param destinations: a dictionary mapping integer node IDs to IP addresses (as strings)
+        :param destinations: a dictionary mapping integer node IDs to IP
+            addresses (as strings)
         """
         self.epoch_length = epoch_length
         self.ID = ID

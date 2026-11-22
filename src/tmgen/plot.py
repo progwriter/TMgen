@@ -1,18 +1,19 @@
-# coding=utf-8
 import warnings
+
 try:
     import seaborn
-    seaborn.set(style='white')
+
+    seaborn.set(style="white")
 except ImportError:
     warnings.warn(
-        'Please consider installing seaborn package for prettier graphs',
+        "Please consider installing seaborn package for prettier graphs",
         stacklevel=2,
     )
 try:
     from matplotlib import pyplot as plt
 except ImportError as e:
     warnings.warn(
-        'Plotting functionality requires the matplotlib library', stacklevel=2
+        "Plotting functionality requires the matplotlib library", stacklevel=2
     )
     raise e
 
@@ -56,16 +57,14 @@ def heatmap(tm, epoch=None):
             matrix = tm.matrix.reshape((n * n, tm.num_epochs()))
             reshaped = True
     if not reshaped:
-        seaborn.heatmap(matrix, cmap='viridis')
-        plt.xlabel('Node')
-        plt.ylabel('Node')
-        plt.title('Volume at epoch {}'.format(epoch if epoch is not None
-                                              else 0))
+        seaborn.heatmap(matrix, cmap="viridis")
+        plt.xlabel("Node")
+        plt.ylabel("Node")
+        plt.title(f"Volume at epoch {epoch if epoch is not None else 0}")
     else:
-        seaborn.heatmap(matrix, xticklabels=max(tm.num_epochs() / 10, 1),
-                        yticklabels=n)
-        plt.xlabel('Time (epochs)')
-        plt.ylabel('Ingress-egress pair')
+        seaborn.heatmap(matrix, xticklabels=max(tm.num_epochs() / 10, 1), yticklabels=n)
+        plt.xlabel("Time (epochs)")
+        plt.ylabel("Ingress-egress pair")
 
 
 def timeseries(tm):
@@ -95,6 +94,6 @@ def timeseries(tm):
     n = tm.num_nodes()
     for i in range(n):
         for e in range(n):
-            plt.plot(tm.between(i, e, 'all'))
-    plt.xlabel('Epoch')
-    plt.ylabel('Volume')
+            plt.plot(tm.between(i, e, "all"))
+    plt.xlabel("Epoch")
+    plt.ylabel("Volume")
