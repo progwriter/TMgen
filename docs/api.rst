@@ -20,5 +20,3 @@ Plotting
 
 .. automodule:: tmgen.plot
   :members:
-
-

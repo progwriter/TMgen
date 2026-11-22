@@ -20,20 +20,20 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
 
     """
     Implementation of the algorithm described in http://arxiv.org/abs/1208.4118
-    
+
     Hamiltonian Monte Carlo method for sampling from a d-dimensional multivariate gaussian distrbution,
     subject to linear constraints :math:`f*x + g \geg 0`
-    
-    :param f: :math:`m \times d` matrix 
-    :param g: :math:`m \times 1` vector 
+
+    :param f: :math:`m \times d` matrix
+    :param g: :math:`m \times 1` vector
     :param m: :math:`d \times d` symmetric, definite positive matrix
-    :param mu_r: :math:`d \times 1` vector 
-    :param covariance: 
-        If covariance is True then m is the covariance matrix otherwise m is the precision matrix 
-    :param num_samples: 
+    :param mu_r: :math:`d \times 1` vector
+    :param covariance:
+        If covariance is True then m is the covariance matrix otherwise m is the precision matrix
+    :param num_samples:
         number of desired samples
-    :param initial_x: :math:`d \times 1` initialization vector, must satisfy the given constraints 
-    :return: 
+    :param initial_x: :math:`d \times 1` initialization vector, must satisfy the given constraints
+    :return:
         a :math:`d \times num_samples` matrix where each column is a sample
     """
     if g.ndim != 1:
