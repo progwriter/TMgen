@@ -6,7 +6,7 @@ TMgen generates network traffic matrices. Python 3.11+, with Cython extensions.
 
 - `src/tmgen/models.pyx`, `tm.pyx`, `hmc.pyx`: compiled modules. Hand-written stubs (`*.pyi`) next to them define the typed public API; `*.pxd` declare the Cython interface.
 - `src/tmgen/plot.py`, `inject/`: pure Python.
-- `tests/`, `docs/` (Sphinx; `docs/quickstart.rst` doctests run under pytest).
+- `tests/`, `docs/` (Sphinx; `docs/quickstart.rst` doctests run under pytest), `tools/` (release helpers, type-checked and tested).
 - `agentdocs/` (git-ignored): local notes such as `PLAN.md` and `API_CRITIQUE.md`. Never commit them. Keep `agentdocs/PLAN.md` current as work lands.
 
 ## Setup and checks
@@ -43,3 +43,7 @@ Gotchas:
 - Conventional Commits (`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`). Imperative, capitalized subject up to 50 characters, no trailing period; body wrapped at 72 explaining what and why.
 - Small, self-contained commits. Each must build and pass the checks above.
 - Fix up earlier unpushed commits with `git commit --fixup=<sha>` and autosquash later. Do not push, force-push or rewrite history unless the owner explicitly asks.
+
+## Releases
+
+See `RELEASING.md`. Releases are tag-driven (`vX.Y.Z`): the version comes from the tag via setuptools-scm, notes come from `CHANGELOG.md`, and `.github/workflows/release.yml` publishes to TestPyPI and, after manual approval, PyPI. Never create or push tags unless the owner asks. Keep `RELEASING.md`, the workflow and `tools/release_notes.py` consistent when changing any of them.
