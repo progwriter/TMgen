@@ -1,8 +1,12 @@
 name: CI
 on:
   push:
-    branches: [master]
+    branches: ["**"]
   pull_request:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -14,6 +18,8 @@ jobs:
         python: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # setuptools-scm needs the tags to compute the version
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -24,3 +30,22 @@ jobs:
       - run: ruff format --check
       - run: mypy
       - run: pytest
+
+  package:
+    # Catch packaging problems on every push, not only when releasing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check --strict dist/*
+      - name: Install the wheel in a clean environment
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install dist/*.whl
+          /tmp/smoke/bin/python -c "import tmgen, tmgen.hmc, tmgen.models; print(tmgen.__version__)"
