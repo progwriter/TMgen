@@ -26,7 +26,8 @@ Homepage = "https://github.com/progwriter/TMgen"
 
 [project.optional-dependencies]
 plotting = ["matplotlib", "seaborn"]
-test = ["pytest", "flake8"]
+test = ["pytest"]
+dev = ["pytest", "ruff", "mypy"]
 
 [project.scripts]
 tmditg = "tmgen.inject.ditg_injector:main"
@@ -39,3 +40,10 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 tmgen = ["*.pxd"]
+
+[tool.ruff]
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
