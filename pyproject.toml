@@ -47,3 +47,8 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "docs"]
+addopts = "--doctest-glob='*.rst'"
+doctest_optionflags = "NORMALIZE_WHITESPACE ALLOW_UNICODE ALLOW_BYTES"
