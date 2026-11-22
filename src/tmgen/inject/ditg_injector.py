@@ -16,7 +16,6 @@ from tmgen.inject import InjectorBase
 
 
 def interrupt_handler(sig, frame):
-    global injector
     if sig == signal.SIGINT:
         injector.stop()
 
@@ -99,6 +98,7 @@ class DITGinjector(InjectorBase):
 
 
 def main():
+    global injector
     parser = argparse.ArgumentParser()
     parser.add_argument('--tm', help='The traffic matrix filename',
                         required=True)
