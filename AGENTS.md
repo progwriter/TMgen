@@ -27,6 +27,8 @@ mypy
 pytest            # tests + docs doctests, each in a temp dir (conftest.py)
 ```
 
+CI also measures coverage (`pytest --cov`, threshold in `pyproject.toml`) on one test leg.
+
 Gotchas:
 
 - Ruff's import sorting depends on whether the extension is built, so run `ruff check` after building.

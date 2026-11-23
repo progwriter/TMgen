@@ -28,7 +28,21 @@ jobs:
       - run: ruff check
       - run: ruff format --check
       - run: mypy
-      - run: pytest
+      - name: Tests
+        if: ${{ !(matrix.os == 'ubuntu-latest' && matrix.python == '3.12') }}
+        run: pytest
+      - name: Tests with coverage
+        # One leg measures coverage; the compiled hmc module is not traced
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.python == '3.12' }}
+        run: pytest --cov --cov-report=term-missing --cov-report=xml
+      - name: Coverage summary
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.python == '3.12' }}
+        run: coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.python == '3.12' }}
+        with:
+          name: coverage-xml
+          path: coverage.xml
 
   pre-commit:
     # Same hooks developers run locally, including the strict docs build
