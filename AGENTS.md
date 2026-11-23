@@ -27,7 +27,7 @@ mypy
 pytest            # tests + docs doctests, each in a temp dir (conftest.py)
 ```
 
-CI also measures coverage (`pytest --cov`, threshold in `pyproject.toml`) on one test leg.
+CI also builds the docs strictly in a `docs` job and measures coverage (`pytest --cov`, threshold in `pyproject.toml`) on one test leg.
 
 Gotchas:
 

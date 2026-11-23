@@ -59,6 +59,9 @@ The pre-commit hooks cover everything above except `pytest`. Notes:
   can write files freely.
 - A `package` CI job builds the sdist and wheel and imports the installed
   wheel, so packaging mistakes show up before a release.
+- A `docs` CI job builds the documentation with warnings as errors
+  (`python -m sphinx -W --keep-going -b html docs docs/_build/html`) and
+  uploads the HTML as an artifact.
 - One test leg (Linux, Python 3.12) measures coverage and fails below the
   `fail_under` threshold in `pyproject.toml`. Run it locally with
   `pytest --cov`. The compiled `hmc` module cannot be traced, so it does not
