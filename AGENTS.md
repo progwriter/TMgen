@@ -32,6 +32,7 @@ CI also builds the docs strictly in a `docs` job and measures coverage (`pytest 
 Gotchas:
 
 - Ruff's import sorting depends on whether the extension is built, so run `ruff check` after building.
+- mypy's result depends on the NumPy version: Python 3.11 resolves an older NumPy than 3.12+, whose stubs infer different types (for example `float * ndarray`). Run `mypy` on 3.11 as well as your default Python before pushing, or annotate such results explicitly instead of relying on `type: ignore`.
 - Ruff and mypy do not see `.pyx` files. When `hmc.pyx`'s signature changes, update `hmc.pyi` by hand.
 
 ## Code style

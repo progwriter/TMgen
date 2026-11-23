@@ -151,7 +151,8 @@ def diurnal_profile(
         )
     wave = numpy.sin(2 * numpy.pi * diurnal_freq * numpy.arange(num_epochs))
     amplitude = numpy.where(wave >= 0, peak_to_mean - 1, 1 - trough_to_mean)
-    return mean * (1 + amplitude * wave)
+    profile: NDArray[numpy.float64] = mean * (1 + amplitude * wave)
+    return profile
 
 
 @renamed_arguments(
