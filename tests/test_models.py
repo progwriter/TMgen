@@ -216,21 +216,51 @@ def test_random_gravity_normalize_gives_exact_total() -> None:
     assert tm.matrix.sum() == pytest.approx(123.0)
 
 
-def test_random_gravity_default_total_is_random_around_expectation() -> None:
+@pytest.mark.parametrize(("symmetric", "factor"), [(False, 1.0), (True, 1.2)])
+def test_random_gravity_total_is_random_around_expectation(
+    symmetric: bool, factor: float
+) -> None:
     num_nodes, total = 5, 100.0
     sums = numpy.array(
-        [random_gravity_tm(num_nodes, total, rng=s).matrix.sum() for s in range(4000)]
+        [
+            random_gravity_tm(num_nodes, total, symmetric=symmetric, rng=s).matrix.sum()
+            for s in range(4000)
+        ]
     )
     assert sums.std() > 1.0
-    assert sums.mean() == pytest.approx(total * (1 + 1 / num_nodes), rel=0.03)
+    # 1 + 1 / num_nodes when rows and columns share their weights
+    assert sums.mean() == pytest.approx(total * factor, rel=0.03)
+
+
+def test_random_gravity_is_asymmetric_by_default() -> None:
+    m = random_gravity_tm(6, 1.0, rng=0).matrix[:, :, 0]
+    assert not numpy.allclose(m, m.T)
+    assert numpy.linalg.matrix_rank(m) == 1
+
+
+def test_random_gravity_symmetric_option() -> None:
+    m = random_gravity_tm(6, 1.0, symmetric=True, rng=0).matrix[:, :, 0]
+    numpy.testing.assert_allclose(m, m.T)
+
+
+def test_random_gravity_ingress_and_egress_are_independent() -> None:
+    m = random_gravity_tm(5000, 1.0, rng=0).matrix[:, :, 0]
+    assert numpy.corrcoef(m.sum(axis=1), m.sum(axis=0))[0, 1] == pytest.approx(
+        0, abs=0.05
+    )
 
 
 def test_random_gravity_weights_are_exponential() -> None:
-    tm = random_gravity_tm(2000, 1.0, rng=0).matrix[:, :, 0]
-    # the diagonal is T/N^2 * u^2, with u ~ Exp(1): E[u^2] = 2, E[u^4] = 24
-    u2 = numpy.diag(tm) * 2000**2
-    assert u2.mean() == pytest.approx(2.0, rel=0.1)
-    assert (u2**2).mean() == pytest.approx(24.0, rel=0.35)
+    n = 2000
+    tm = random_gravity_tm(n, 1.0, rng=0).matrix[:, :, 0]
+    # the diagonal is T/N^2 * u * v with u, v ~ Exp(1) independent:
+    # E[uv] = 1 and E[(uv)^2] = 4
+    uv = numpy.diag(tm) * n**2
+    assert uv.mean() == pytest.approx(1.0, rel=0.1)
+    assert (uv**2).mean() == pytest.approx(4.0, rel=0.35)
+    # a row sum is proportional to u, whose spread is that of Exp(1)
+    rows = tm.sum(axis=1)
+    assert rows.std() / rows.mean() == pytest.approx(1.0, rel=0.1)
 
 
 _INVALID_CALLS = {

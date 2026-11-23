@@ -212,6 +212,7 @@ def random_gravity_tm(
     mean_traffic: float,
     *,
     normalize: bool = False,
+    symmetric: bool = False,
     rng: RngLike = None,
 ) -> TrafficMatrix:
     """
@@ -219,12 +220,19 @@ def random_gravity_tm(
     (eq. 6 of Tune and Roughan, SIGCOMM 2015; originally from
     http://dl.acm.org/citation.cfm?id=1096551).
 
-    The matrix is :math:`X = (T / N^2)\\, u u^T` with the node weights
-    :math:`u_i` drawn independently from an exponential distribution with
-    mean 1, where :math:`T` is *mean_traffic* and :math:`N` is *num_nodes*.
-    The weights are shared by rows and columns, so the matrix is symmetric.
-    Its entries sum to :math:`T (1 + 1/N)` on average, and to a random value
-    in any one draw; use *normalize* for an exact total.
+    The matrix is :math:`X = (T / N^2)\\, u v^T`, where :math:`T` is
+    *mean_traffic*, :math:`N` is *num_nodes*, and the ingress weights
+    :math:`u_i` and egress weights :math:`v_j` are drawn independently from an
+    exponential distribution with mean 1. Its entries sum to :math:`T` on
+    average, and to a random value in any one draw; use *normalize* for an
+    exact total.
+
+    The matrix includes traffic from each node to itself (the diagonal). To
+    remove it, copy the data and zero the diagonal, which lowers the total::
+
+        m = tm.matrix.copy()
+        numpy.fill_diagonal(m[:, :, 0], 0)
+        tm = TrafficMatrix(m)
 
     :param num_nodes: number of nodes in the network
     :param mean_traffic: the total traffic volume of the matrix, in
@@ -232,14 +240,19 @@ def random_gravity_tm(
         of nodes is this divided by ``num_nodes ** 2``
     :param normalize: scale the matrix so that its entries sum to exactly
         *mean_traffic*
+    :param symmetric: use the same weights for ingress and egress, which makes
+        the matrix symmetric. Its entries then sum to
+        :math:`T (1 + 1/N)` on average
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: a new :py:class:`~TrafficMatrix`
     """
     num_nodes = _count(num_nodes, "num_nodes")
     mean_traffic = _number(mean_traffic, "mean_traffic")
-    weights = _resolve_rng(rng).exponential(1.0, size=num_nodes)
-    scale = weights.sum() ** 2 if normalize else num_nodes**2
-    matrix = numpy.outer(weights, weights) * (mean_traffic / scale)
+    gen = _resolve_rng(rng)
+    ingress = gen.exponential(1.0, size=num_nodes)
+    egress = ingress if symmetric else gen.exponential(1.0, size=num_nodes)
+    scale = ingress.sum() * egress.sum() if normalize else num_nodes**2
+    matrix = numpy.outer(ingress, egress) * (mean_traffic / scale)
     return TrafficMatrix._from_owned(matrix.reshape((num_nodes, num_nodes, 1)))
 
 

@@ -39,12 +39,14 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 - `TMgenException` is now a subclass of `ValueError`. `hmc_sample` raises it
   (instead of a bare `ValueError`) and checks the shapes of its arguments and
   that `num_samples` is at least 1; `num_samples=1` returns the initial point.
-- `random_gravity_tm` draws its node weights from an exponential distribution
-  (eq. 6 of the paper) instead of normalized uniforms, so matrices are more
-  skewed. The total is now random, `mean_traffic * (1 + 1/num_nodes)` on
-  average because rows and columns share the weights; pass `normalize=True`
-  for an exact total of `mean_traffic`. The docs now say that `mean_traffic`
-  is the total, not the per-pair average.
+- `random_gravity_tm` follows the paper and the reference the issue cites
+  (#7): ingress and egress weights are independent exponential draws instead
+  of one normalized uniform vector, so matrices are more skewed and no longer
+  symmetric. The total is random, `mean_traffic` on average; pass
+  `normalize=True` for an exact total, or `symmetric=True` to share the
+  weights between rows and columns (the total is then `mean_traffic * (1 +
+  1/num_nodes)` on average). The docs now say that `mean_traffic` is the
+  total, not the per-pair average, and show how to zero the diagonal.
 - `spike_tm` follows the paper: `num_spikes` is the total number of spikes
   over the whole `num_nodes x num_nodes x num_epochs` array, chosen uniformly,
   instead of that many per epoch. Multi-epoch results change.
