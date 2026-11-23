@@ -43,7 +43,7 @@ built. CI runs the same hooks.
 
 ## Checks
 
-CI runs these on every push (Linux, macOS and Windows, Python 3.11-3.15):
+CI runs these on every push (Linux and Windows, Python 3.11-3.15; macOS is only exercised by the wheel builds at release time, because GitHub's macOS arm64 runners are often unavailable):
 
 ```
 ruff check
