@@ -1,8 +1,11 @@
 # TMgen: traffic matrix generation
 
 [![PyPI](https://img.shields.io/pypi/v/tmgen)](https://pypi.org/project/tmgen/)
+[![Python versions](https://img.shields.io/pypi/pyversions/tmgen)](https://pypi.org/project/tmgen/)
+[![CI](https://github.com/progwriter/TMgen/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/progwriter/TMgen/actions/workflows/ci.yml)
 [![Docs](https://readthedocs.org/projects/tmgen/badge/?version=latest)](https://tmgen.readthedocs.io/)
 [![Coverage](https://codecov.io/gh/progwriter/TMgen/graph/badge.svg)](https://codecov.io/gh/progwriter/TMgen)
+[![License](https://img.shields.io/pypi/l/tmgen)](https://github.com/progwriter/TMgen/blob/master/LICENSE)
 
 TMgen generates synthetic network **traffic matrices**: how much traffic flows
 from each node of a network to each other node, optionally over time. Use it to
