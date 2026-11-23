@@ -36,6 +36,12 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- `tmgen.plot.heatmap` and `timeseries` accept a keyword-only `ax` (matplotlib
+  axes, default the current axes) and return the axes they drew on, so they
+  can be used in subplots. The single-epoch heatmap labels its axes "Ingress
+  node" and "Egress node", and `timeseries` draws all lines with one call. The
+  examples in the docstrings, which called a nonexistent `tmgen.exp_tm`, are
+  fixed.
 - `TrafficMatrix.num_nodes` and `num_epochs` are properties instead of methods,
   and there is a new `shape` property. Calling them as before still works and
   emits a `DeprecationWarning`.
