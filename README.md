@@ -74,14 +74,14 @@ pip install .                 # or ".[plotting]" for the plotting helpers
 
 The version number comes from the git tags, so clone the repository (a plain
 source archive of a release also works) rather than downloading a snapshot of a
-branch. To work on TMgen itself, see [DEVELOPMENT.md](DEVELOPMENT.md) for an
+branch. To work on TMgen itself, see [DEVELOPMENT.md](https://github.com/progwriter/TMgen/blob/master/DEVELOPMENT.md) for an
 editable install with the development tools.
 
 ## Documentation
 
 The full documentation, with a guide to every model, file formats, sampling and
 plotting, is at <https://tmgen.readthedocs.io/>. Upgrading from 0.1? See the
-[changelog](CHANGELOG.md) and the upgrade notes in the docs.
+[changelog](https://github.com/progwriter/TMgen/blob/master/CHANGELOG.md) and the upgrade notes in the docs.
 
 ## Big thanks
 
@@ -92,5 +92,5 @@ versions [MaxEnt](https://github.com/ptuls/MaxEntTM) and
 
 ## Development
 
-Contributions are welcome. See [DEVELOPMENT.md](DEVELOPMENT.md) for how to set
+Contributions are welcome. See [DEVELOPMENT.md](https://github.com/progwriter/TMgen/blob/master/DEVELOPMENT.md) for how to set
 up a development environment, run the checks and submit changes.
