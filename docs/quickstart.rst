@@ -1,97 +1,83 @@
 Quickstart
 ==========
 
-This document oulitnes how to easily start using the TMgen tool.
-
-Download and installation
--------------------------
-
-Using pip
-^^^^^^^^^
+Installation
+------------
 
 ::
 
     pip install tmgen
 
-From source
-^^^^^^^^^^^
+TMgen needs Python 3.11 or newer. Prebuilt wheels are published for common
+platforms; building from source needs a C compiler (the HMC sampler is a small
+Cython extension). The plotting helpers need matplotlib, which you can get with
+``pip install "tmgen[plotting]"``.
 
-1. Clone ::
+To work on TMgen itself, see ``DEVELOPMENT.md`` in the repository.
 
-    git clone https://github.com/progwriter/tmgen
+Your first traffic matrix
+-------------------------
 
-2. Install using pip in development mode ::
-
-    cd tmgen
-    pip install -e .
-
-Example usage
--------------
-
-TMgen defines a ``TrafficMatrix`` object that is returned by all generator
-functions. Internally it contains a 3-d numpy array which contains volume of
-traffic between ingress-egress pairs for different time epochs. For TM models
-that do not have a time component, the third dimension is of size 1.
-
-Quick overview on how to use them is given here,
-for full details please see the :ref:`API`
-
-Generating a traffic matrix
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Lets generate a uniform traffic matrix for a network with 3 nodes:
-
->>> from tmgen.models import uniform_tm
->>> tm = uniform_tm(3, 100, 300)
->>> print(tm) # doctest: +ELLIPSIS
-array([[[...
-<BLANKLINE>
-...
-<BLANKLINE>
-...]]])
-
-This gives us a 3x3x1 array with values between 100 and 300 --- volume for each
-node pair, with only one time epoch.
-
-Accessing tm entries
-^^^^^^^^^^^^^^^^^^^^
-
-TMgen gives you a number of ways to access the TM values. Lets generate an
-exponential TM with the mean volume of 500 and 2 time epochs.
+Every model is a function in :py:mod:`tmgen.models` that returns a
+:py:class:`~tmgen.TrafficMatrix`. Here is a network of 4 nodes where each entry
+is drawn from an exponential distribution with a mean of 100, for 3 time
+epochs:
 
 >>> from tmgen.models import exp_tm
->>> tm = exp_tm(3, 500, 2)
+>>> tm = exp_tm(num_nodes=4, mean_entry=100, num_epochs=3, rng=42)
+>>> tm.shape
+(4, 4, 3)
 
-Accessing the *matrix* attrbute gives us the underlying Numpy array:
+The shape is ``(ingress, egress, epoch)``: entry ``tm[i, j, t]`` is the volume
+from node ``i`` to node ``j`` during epoch ``t``. Models without a time
+component, such as :py:func:`~tmgen.models.gravity_tm`, have a single epoch.
 
->>> tm.matrix # doctest: +ELLIPSIS
-array([[[...
-<BLANKLINE>
-...
-<BLANKLINE>
-...]]])
+The ``rng`` argument makes the result reproducible: the same seed gives the same
+matrix (see :ref:`reproducibility`).
 
-Also we can request a traffic matrix at a specific epoch (0-indexed):
+Reading the data
+----------------
 
->>> tm.at_time(1) # doctest: +ELLIPSIS
-array([[...]])
+>>> tm.num_nodes, tm.num_epochs
+(4, 3)
+>>> tm.at_time(1).shape             # the 4 x 4 matrix of epoch 1
+(4, 4)
+>>> tm.between(0, 2).shape          # volumes from node 0 to node 2, per epoch
+(3,)
+>>> bool(tm.between(0, 2, "max") >= tm.between(0, 2, "mean"))
+True
 
-Or the values between any node pair, with a particular aggregation metric:
+:py:attr:`~tmgen.TrafficMatrix.matrix` is the underlying NumPy array, and
+``numpy.asarray(tm)`` works too. Matrices are read-only: see :doc:`concepts`
+for why, and :doc:`io` for everything you can do with the data.
 
->>> tm.between(0, 2) # doctest: +ELLIPSIS
-array([...])
->>> tm.between(0, 2, 'max') # doctest: +SKIP
->>> tm.between(0, 2, 'mean') # doctest: +SKIP
+A realistic example
+-------------------
 
-See :ref:`API` for all supported functions.
+Real traffic follows a daily cycle. The modulated gravity model produces a
+matrix per hour whose total follows a cycle, with traffic spread over the
+nodes in a gravity pattern:
 
-Saving/Loading a traffic matrix
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>>> from tmgen.models import modulated_gravity_tm
+>>> day = modulated_gravity_tm(num_nodes=6, num_epochs=24, total_traffic=1000, rng=1)
+>>> totals = day.matrix.sum(axis=(0, 1))     # total traffic of each hour
+>>> round(float(totals.min())), round(float(totals.max()))  # 0.5x to 1.5x
+(500, 1500)
 
-A traffic matrix can be saved to, and loaded from, a compressed NumPy ``.npz``
-file. Loading never runs code from the file, so it is safe for files you did not
-create:
+Saving and loading
+------------------
+
+A matrix is saved as a compressed NumPy ``.npz`` file. Loading never runs code
+from the file, so it is safe for files you did not create:
 
 >>> from tmgen import TrafficMatrix
->>> tm.save('mytm.npz')
->>> tm = TrafficMatrix.load('mytm.npz')
+>>> day.save("day.npz")
+>>> TrafficMatrix.load("day.npz") == day
+True
+
+Next steps
+----------
+
+* :doc:`models` helps you pick a model.
+* :doc:`concepts` explains the vocabulary and the guarantees of a
+  ``TrafficMatrix``.

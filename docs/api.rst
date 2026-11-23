@@ -1,22 +1,38 @@
 .. _API:
 
-TMgen API
-=========
+API reference
+=============
 
-Generators
-----------
+Models
+------
 
 .. automodule:: tmgen.models
   :members:
 
-TrafficMatrix instance
-----------------------
+TrafficMatrix
+-------------
 
 .. autoclass:: tmgen.TrafficMatrix
   :members:
+
+Errors
+------
+
+.. autoexception:: tmgen.TMgenException
+
+Sampling
+--------
+
+.. autofunction:: tmgen.hmc.hmc_sample
 
 Plotting
 --------
 
 .. automodule:: tmgen.plot
+  :members:
+
+Traffic injection
+-----------------
+
+.. autoclass:: tmgen.inject.InjectorBase
   :members:
