@@ -126,6 +126,8 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Fixed
 
+- `tmgen.plot.heatmap` with seaborn raised `TypeError` for multi-epoch matrices of
+  more than 10 epochs (the tick label step was a float).
 - The trough of the `modulated_gravity_tm` cycle was inverted: with the default
   `t_ratio=0.75` the "trough" stayed above the mean (values from 1.0 to 1.5
   times the mean, averaging 1.24). `trough_to_mean` is now the lowest value

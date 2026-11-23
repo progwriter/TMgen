@@ -78,7 +78,7 @@ def heatmap(
         matrix = tm.matrix.reshape((n * n, tm.num_epochs))
         if seaborn is not None:
             seaborn.heatmap(
-                matrix, xticklabels=max(tm.num_epochs / 10, 1), yticklabels=n, ax=ax
+                matrix, xticklabels=max(tm.num_epochs // 10, 1), yticklabels=n, ax=ax
             )
         else:
             _matplotlib_heatmap(matrix, ax)

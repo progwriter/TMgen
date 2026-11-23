@@ -57,3 +57,10 @@ def test_timeseries_draws_one_line_per_pair() -> None:
     ax = plot.timeseries(TrafficMatrix(numpy.random.rand(3, 3, 5)))
     assert len(ax.lines) == 9
     assert all(numpy.asarray(line.get_ydata()).size == 5 for line in ax.lines)
+
+
+def test_heatmap_of_many_epochs_labels_every_tenth() -> None:
+    # seaborn needs an integer step for the tick labels
+    pytest.importorskip("seaborn")
+    ax = plot.heatmap(TrafficMatrix(numpy.random.rand(3, 3, 24)))
+    assert len(ax.get_xticks()) == 12
