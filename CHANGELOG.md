@@ -23,6 +23,9 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- `spike_tm` follows the paper: `num_spikes` is the total number of spikes
+  over the whole `num_nodes x num_nodes x num_epochs` array, chosen uniformly,
+  instead of that many per epoch. Multi-epoch results change.
 - The HMC sampler is a typed Cython kernel that updates its working products
   incrementally (Gram matrix), roughly 8-25x faster. Samples are statistically
   equivalent but no longer bit-identical to the previous implementation for

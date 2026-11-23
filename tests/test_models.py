@@ -91,9 +91,35 @@ def test_rng_is_keyword_only(name: str) -> None:
         random_gravity_tm(3, 1.0, 7)  # type: ignore[call-arg]
 
 
-def test_spike_has_exactly_num_spikes_per_epoch() -> None:
+def test_spike_has_exactly_num_spikes_in_total() -> None:
     tm = spike_tm(5, 4, 2.0, num_epochs=6, rng=0)
-    assert ((tm.matrix > 0).sum(axis=(0, 1)) == 4).all()
+    assert (tm.matrix > 0).sum() == 4
+
+
+def test_spike_support_is_uniform_over_all_entries() -> None:
+    counts = numpy.zeros((3, 3, 4))
+    for seed in range(2000):
+        counts += spike_tm(3, 5, 1.0, num_epochs=4, rng=seed).matrix > 0
+    # each of the 36 entries is a spike with probability 5/36
+    assert counts.mean() / 2000 == pytest.approx(5 / 36)
+    assert counts.std() / 2000 < 0.02
+
+
+def test_spike_values_are_exponential() -> None:
+    tm = spike_tm(20, 300, 7.0, num_epochs=3, rng=1)
+    values = tm.matrix[tm.matrix > 0]
+    assert values.size == 300
+    assert values.mean() == pytest.approx(7.0, rel=0.15)
+
+
+@pytest.mark.parametrize("spikes", [-1, 3 * 3 * 2 + 1])
+def test_spike_count_out_of_range(spikes: int) -> None:
+    with pytest.raises(TMgenException):
+        spike_tm(3, spikes, 1.0, num_epochs=2)
+
+
+def test_spike_can_fill_every_entry() -> None:
+    assert (spike_tm(2, 8, 1.0, num_epochs=2, rng=0).matrix > 0).all()
 
 
 def test_gravity_matches_definition() -> None:

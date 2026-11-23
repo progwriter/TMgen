@@ -285,35 +285,31 @@ def spike_tm(
     """
     Generate a traffic matrix using the spike model.
 
+    Exactly *num_spikes* entries of the whole ``num_nodes x num_nodes x
+    num_epochs`` array are non-zero, chosen uniformly at random without
+    replacement (so spikes may cluster in some epochs and be absent from
+    others). Spike volumes are exponentially distributed, and all other
+    entries are zero. See eq. 16 of Tune and Roughan, SIGCOMM 2015.
+
     :param num_nodes: number of nodes in the network
-    :param num_spikes: number of ingress-egress spikes. Must be fewer than :math:`n^2`
+    :param num_spikes: total number of spikes over all epochs. At most
+        ``num_nodes * num_nodes * num_epochs``
     :param mean_spike: average volume of a single spike
     :param num_epochs: number of time epochs
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
     """
-    if not num_spikes < num_nodes * num_nodes:
+    size = num_nodes * num_nodes * num_epochs
+    if not 0 <= num_spikes <= size:
         raise TMgenException(
-            "Number of spikes cannot be larger than number of ingress-egress pairs"
+            "Number of spikes must be between 0 and the number of entries "
+            "(num_nodes * num_nodes * num_epochs)"
         )
-    # Start by generating a non-negative exponential matrix
     gen = _resolve_rng(rng)
-    tm = gen.exponential(mean_spike, size=(num_nodes, num_nodes, num_epochs)).clip(
-        min=0
-    )
-
-    # Each epoch keeps `num_spikes` entries. The mask is shuffled in place
-    # epoch after epoch (rather than drawn independently) to keep the random
-    # stream, and hence seeded output, identical to earlier releases.
-    mask = numpy.zeros(num_nodes * num_nodes, dtype=bool)
-    mask[:num_spikes] = True
-    keep = numpy.empty((num_epochs, num_nodes * num_nodes), dtype=bool)
-    for e in range(num_epochs):
-        gen.shuffle(mask)
-        keep[e] = mask
-    tm[~keep.T.reshape((num_nodes, num_nodes, num_epochs))] = 0
-
-    return TrafficMatrix(tm)
+    tm = numpy.zeros(size)
+    support = gen.choice(size, size=num_spikes, replace=False)
+    tm[support] = gen.exponential(mean_spike, size=num_spikes)
+    return TrafficMatrix(tm.reshape((num_nodes, num_nodes, num_epochs)))
 
 
 def lognormal_tm(
