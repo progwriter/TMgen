@@ -2,7 +2,7 @@ import os
 import pickle
 
 import numpy
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 from tmgen.exceptions import TMgenException
 
@@ -24,33 +24,60 @@ def _canonical_mode(m: str) -> str:
 
 class TrafficMatrix:
     """
-    Represents a traffic matrix.
+    Represents a traffic matrix: non-negative traffic volumes between
+    ``num_nodes`` nodes over ``num_epochs`` time epochs.
+
+    The data is copied on construction and exposed read-only through
+    :py:attr:`matrix`, so a matrix cannot change after it is created. Arrays
+    returned by the accessors are read-only views of that data; copy them
+    before modifying.
     """
 
-    matrix: NDArray[numpy.float64]
-
-    def __init__(self, tm: NDArray[numpy.float64]) -> None:
+    def __init__(self, tm: ArrayLike) -> None:
         """
         Create a new traffic matrix from the given array
 
-        :param tm: the Numpy ndarray. Must have three dimetions, n x n x m.
-            If the matrix has no variability in time, them m=1
-            First two dimensions must match, as a single traffic matrix is
-            always n x n.
+        :param tm: array-like of non-negative, finite numbers with three
+            dimensions, n x n x m. If the matrix has no variability in time,
+            then m=1. First two dimensions must match, as a single traffic
+            matrix is always n x n. The data is converted to float64 and
+            copied.
         """
-        if not isinstance(tm, numpy.ndarray):
-            raise TypeError(f"Expected a numpy array, got {type(tm).__name__}")
-        if not tm.ndim == 3:  # 2d + time
+        try:
+            matrix = numpy.array(tm, dtype=numpy.float64)
+        except (TypeError, ValueError):
+            raise TMgenException("Traffic matrix must be an array of numbers") from None
+        self._set_matrix(matrix)
+        if not numpy.isfinite(matrix).all() or (matrix < 0).any():
+            raise TMgenException("Traffic volumes must be finite and non-negative")
+
+    @classmethod
+    def _from_owned(cls, matrix: NDArray[numpy.float64]) -> "TrafficMatrix":
+        """Wrap a float64 array that nothing else references, without copying."""
+        self = cls.__new__(cls)
+        self._set_matrix(matrix)
+        return self
+
+    def _set_matrix(self, matrix: NDArray[numpy.float64]) -> None:
+        if matrix.ndim != 3:  # 2d + time
             raise TMgenException(
-                "Traffic matrix must have 3 dimensions: n x n x m,"
+                "Traffic matrix must have 3 dimensions: n x n x m, "
                 "where n is number of nodes and m is number of "
                 "epochs (at least 1)"
             )
-        if not tm.shape[0] == tm.shape[1]:  # num_nodes both ways
+        if matrix.shape[0] != matrix.shape[1]:  # num_nodes both ways
             raise TMgenException(
-                "First two dimentions of the traffic matrix must match"
+                "First two dimensions of the traffic matrix must match"
             )
-        self.matrix = tm
+        if matrix.size == 0:
+            raise TMgenException("Traffic matrix needs at least one node and epoch")
+        matrix.flags.writeable = False
+        self._matrix = matrix
+
+    @property
+    def matrix(self) -> NDArray[numpy.float64]:
+        """The traffic volumes as a read-only n x n x m array."""
+        return self._matrix
 
     def at_time(self, t: int) -> NDArray[numpy.float64]:
         """
@@ -113,11 +140,7 @@ class TrafficMatrix:
         Returns a new traffic matrix that is the average across all epochs.
 
         """
-        return TrafficMatrix(
-            numpy.reshape(
-                self.matrix.mean(axis=2), (self.num_nodes(), self.num_nodes(), 1)
-            )
-        )
+        return TrafficMatrix._from_owned(self.matrix.mean(axis=2, keepdims=True))
 
     def worst_case(self) -> "TrafficMatrix":
         """
@@ -126,11 +149,7 @@ class TrafficMatrix:
 
         :return: a new TrafficMatrix
         """
-        return TrafficMatrix(
-            numpy.reshape(
-                self.matrix.max(axis=2), (self.num_nodes(), self.num_nodes(), 1)
-            )
-        )
+        return TrafficMatrix._from_owned(self.matrix.max(axis=2, keepdims=True))
 
     def num_nodes(self) -> int:
         """
@@ -162,4 +181,11 @@ class TrafficMatrix:
         return self.num_epochs()
 
     def __add__(self, other: "TrafficMatrix") -> "TrafficMatrix":
-        return TrafficMatrix(self.matrix + other.matrix)
+        if not isinstance(other, TrafficMatrix):
+            return NotImplemented
+        if self.matrix.shape != other.matrix.shape:
+            raise TMgenException(
+                f"Cannot add traffic matrices of shapes {self.matrix.shape} "
+                f"and {other.matrix.shape}"
+            )
+        return TrafficMatrix._from_owned(self.matrix + other.matrix)

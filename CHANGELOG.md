@@ -23,6 +23,13 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- `TrafficMatrix` is immutable: the constructor accepts any array-like, converts
+  it to float64 and copies it once, and `matrix` is a read-only property (so
+  `tm.matrix = ...` and `tm.matrix[...] = ...` fail, and `at_time`, `between`
+  and the other accessors return read-only data; copy before modifying).
+  It raises `TMgenException` for the wrong shape, NaN, infinite or negative
+  volumes, or an empty matrix, and adding matrices of different shapes raises
+  `TMgenException`.
 - All models validate their arguments and raise `TMgenException` (a
   `ValueError`) with a message naming the argument: sizes and epoch counts must
   be positive whole numbers, volumes finite and non-negative, `sigma` and the
@@ -51,8 +58,7 @@ time, rename that section to the new version and date (see `RELEASING.md`).
   unchanged.
 - `TrafficMatrix` and the traffic models are now pure Python/NumPy instead
   of Cython, with identical results for a given NumPy seed. Only the HMC
-  sampler is still compiled. `TrafficMatrix` now raises `TypeError` for
-  non-array input.
+  sampler is still compiled.
 - Requires Python 3.11 or newer.
 - Package metadata and build requirements moved to `pyproject.toml`; the
   version is derived from git tags.

@@ -204,7 +204,7 @@ def modulated_gravity_tm(
         gen, total / mean_total, numpy.sqrt(temporal_variance) / mean_total
     )
     gravity = mean_total * numpy.outer(node, node)
-    return TrafficMatrix(gravity[:, :, None] * modulation)
+    return TrafficMatrix._from_owned(gravity[:, :, None] * modulation)
 
 
 def random_gravity_tm(
@@ -240,7 +240,7 @@ def random_gravity_tm(
     weights = _resolve_rng(rng).exponential(1.0, size=num_nodes)
     scale = weights.sum() ** 2 if normalize else num_nodes**2
     matrix = numpy.outer(weights, weights) * (mean_traffic / scale)
-    return TrafficMatrix(matrix.reshape((num_nodes, num_nodes, 1)))
+    return TrafficMatrix._from_owned(matrix.reshape((num_nodes, num_nodes, 1)))
 
 
 def gravity_tm(populations: ArrayLike, total_traffic: float) -> TrafficMatrix:
@@ -271,7 +271,7 @@ def gravity_tm(populations: ArrayLike, total_traffic: float) -> TrafficMatrix:
     num_nodes = populations.size
     denom = populations.sum() ** 2
     res = numpy.outer(populations, populations) / denom * total_traffic
-    return TrafficMatrix(res.reshape((num_nodes, num_nodes, 1)))
+    return TrafficMatrix._from_owned(res.reshape((num_nodes, num_nodes, 1)))
 
 
 def uniform_tm(
@@ -300,7 +300,7 @@ def uniform_tm(
     if low > high:
         raise TMgenException(f"low ({low:g}) must not exceed high ({high:g})")
     r = _resolve_rng(rng).random((num_nodes, num_nodes, num_epochs))
-    return TrafficMatrix(
+    return TrafficMatrix._from_owned(
         numpy.reshape(low + (high - low) * r, (num_nodes, num_nodes, num_epochs)).clip(
             min=0
         )
@@ -323,7 +323,7 @@ def exp_tm(
     num_nodes = _count(num_nodes, "num_nodes")
     num_epochs = _count(num_epochs, "num_epochs")
     mean_traffic = _number(mean_traffic, "mean_traffic")
-    return TrafficMatrix(
+    return TrafficMatrix._from_owned(
         _resolve_rng(rng)
         .exponential(mean_traffic, size=(num_nodes, num_nodes, num_epochs))
         .clip(min=0)
@@ -370,7 +370,7 @@ def spike_tm(
     tm = numpy.zeros(size)
     support = gen.choice(size, size=num_spikes, replace=False)
     tm[support] = gen.exponential(mean_spike, size=num_spikes)
-    return TrafficMatrix(tm.reshape((num_nodes, num_nodes, num_epochs)))
+    return TrafficMatrix._from_owned(tm.reshape((num_nodes, num_nodes, num_epochs)))
 
 
 def lognormal_tm(
@@ -396,7 +396,7 @@ def lognormal_tm(
     num_epochs = _count(num_epochs, "num_epochs")
     mean_traffic = _number(mean_traffic, "mean_traffic", minimum=None)
     sigma = _number(sigma, "sigma")
-    return TrafficMatrix(
+    return TrafficMatrix._from_owned(
         _resolve_rng(rng)
         .lognormal(
             mean=mean_traffic, sigma=sigma, size=(num_nodes, num_nodes, num_epochs)
@@ -419,7 +419,9 @@ def exact_tm(num_nodes: int, val: float, num_epochs: int = 1) -> TrafficMatrix:
     num_nodes = _count(num_nodes, "num_nodes")
     num_epochs = _count(num_epochs, "num_epochs")
     val = _number(val, "val")
-    return TrafficMatrix(numpy.ones((num_nodes, num_nodes, num_epochs)) * val)
+    return TrafficMatrix._from_owned(
+        numpy.ones((num_nodes, num_nodes, num_epochs)) * val
+    )
 
 
 __all__ = [
