@@ -38,6 +38,11 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- `TrafficMatrix(matrix)` and `at_time(epoch)` use the library's vocabulary
+  (the parameters were `tm` and `t`; the old keywords still work with a
+  `DeprecationWarning`). `repr(tm)` is now short, such as
+  `TrafficMatrix(num_nodes=4, num_epochs=3)`, instead of the whole array;
+  `str(tm)` and `print(tm)` still show the values.
 - `modulated_gravity_tm` draws independent ingress and egress shares by default
   (as the paper's model does, and as `random_gravity_tm` now does), so its
   matrices are no longer symmetric and seeded output changes. Pass

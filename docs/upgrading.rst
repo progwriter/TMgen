@@ -24,6 +24,8 @@ Old                                               New
 ``modulated_gravity_tm(t_ratio=...)``             ``trough_to_mean``
 ``tm.between(o, d, modestr)``                     ``tm.between(ingress, egress, agg)``
 ``tm.num_nodes()``, ``tm.num_epochs()``           ``tm.num_nodes``, ``tm.num_epochs``
+``TrafficMatrix(tm=...)``                         ``TrafficMatrix(matrix=...)``
+``tm.at_time(t=...)``                             ``tm.at_time(epoch=...)``
 ``to_pickle``, ``from_pickle``                    ``save``, ``load`` (``.npz``)
 ================================================  ====================================
 
@@ -36,6 +38,8 @@ Behavior changes
 
 These change results, so check your code and your expectations:
 
+* **``repr(tm)`` is short**, e.g. ``TrafficMatrix(num_nodes=4, num_epochs=3)``;
+  ``print(tm)`` and ``str(tm)`` still show the values.
 * **The matrix is read-only and validated.** ``tm.matrix[...] = value`` and
   ``tm.matrix = ...`` fail; build a new ``TrafficMatrix`` from a copy. Negative,
   NaN or infinite volumes and wrongly shaped arrays are rejected.

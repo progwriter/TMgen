@@ -320,3 +320,21 @@ def test_modulate_rejects_multi_epoch_matrices() -> None:
 def test_modulate_rejects_invalid_profiles(profile: object) -> None:
     with pytest.raises(TMgenException):
         TrafficMatrix(numpy.ones((2, 2, 1))).modulate(profile)  # type: ignore[arg-type]
+
+
+def test_repr_is_short_and_str_shows_the_values() -> None:
+    tm = TrafficMatrix(numpy.arange(8.0).reshape((2, 2, 2)))
+    assert repr(tm) == "TrafficMatrix(num_nodes=2, num_epochs=2)"
+    assert str(tm) == str(tm.matrix)
+    big = TrafficMatrix(numpy.ones((300, 300, 100)))
+    assert len(repr(big)) < 80
+
+
+def test_constructor_and_at_time_accept_the_old_keywords() -> None:
+    with pytest.warns(DeprecationWarning, match="'tm' is deprecated, use 'matrix'"):
+        tm = TrafficMatrix(tm=numpy.arange(8.0).reshape((2, 2, 2)))  # type: ignore[call-arg]
+    assert TrafficMatrix(matrix=tm.matrix) == tm
+    numpy.testing.assert_array_equal(tm.at_time(epoch=1), tm.at_time(1))
+    with pytest.warns(DeprecationWarning, match="'t' is deprecated, use 'epoch'"):
+        numpy.testing.assert_array_equal(tm.at_time(t=1), tm.at_time(1))  # type: ignore[call-arg]
+    numpy.testing.assert_array_equal(tm.at_time(-1), tm.at_time(1))

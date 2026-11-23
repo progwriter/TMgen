@@ -74,22 +74,23 @@ class TrafficMatrix:
     before modifying.
     """
 
-    def __init__(self, tm: ArrayLike) -> None:
+    @renamed_arguments(tm="matrix")
+    def __init__(self, matrix: ArrayLike) -> None:
         """
         Create a new traffic matrix from the given array
 
-        :param tm: array-like of non-negative, finite numbers with three
+        :param matrix: array-like of non-negative, finite numbers with three
             dimensions, n x n x m. If the matrix has no variability in time,
             then m=1. First two dimensions must match, as a single traffic
             matrix is always n x n. The data is converted to float64 and
             copied.
         """
         try:
-            matrix = numpy.array(tm, dtype=numpy.float64)
+            data = numpy.array(matrix, dtype=numpy.float64)
         except (TypeError, ValueError):
             raise TMgenException("Traffic matrix must be an array of numbers") from None
-        self._set_matrix(matrix)
-        if not numpy.isfinite(matrix).all() or (matrix < 0).any():
+        self._set_matrix(data)
+        if not numpy.isfinite(data).all() or (data < 0).any():
             raise TMgenException("Traffic volumes must be finite and non-negative")
 
     @classmethod
@@ -120,14 +121,16 @@ class TrafficMatrix:
         """The traffic volumes as a read-only n x n x m array."""
         return self._matrix
 
-    def at_time(self, t: int) -> NDArray[numpy.float64]:
+    @renamed_arguments(t="epoch")
+    def at_time(self, epoch: int) -> NDArray[numpy.float64]:
         """
-        Return a numpy array reprenseting a single TM at epoch t.
+        Return the matrix of one epoch: an ``n x n`` read-only array indexed
+        by ingress and egress node.
 
-        :param t: the number of the epoch (0-indexed).
-        :rtype: numpy array
+        :param epoch: the number of the epoch (0-indexed, negative values count
+            from the end).
         """
-        return self.matrix[:, :, t]
+        return self.matrix[:, :, epoch]
 
     @overload
     def between(
@@ -395,7 +398,12 @@ class TrafficMatrix:
             return TrafficMatrix(pickle.load(f))
 
     def __repr__(self) -> str:
-        return repr(self.matrix)
+        return (
+            f"TrafficMatrix(num_nodes={self.num_nodes}, num_epochs={self.num_epochs})"
+        )
+
+    def __str__(self) -> str:
+        return str(self.matrix)
 
     def __len__(self) -> int:
         return self.num_epochs
