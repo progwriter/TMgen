@@ -46,13 +46,36 @@ not exposed yet.
 
 ## Installation
 
+TMgen needs Python 3.11 or newer.
+
+### From PyPI
+
 ```
 pip install tmgen
 ```
 
-Prebuilt wheels are published for common platforms. Building from source needs
-Python 3.11+ and a C compiler. For the plotting helpers, install the extra:
+Prebuilt wheels are published for Linux, macOS and Windows, so no compiler is
+needed. For the plotting helpers, install the extra:
 `pip install "tmgen[plotting]"`.
+
+### From source
+
+Use this for the latest unreleased changes, or to try a modification. The HMC
+sampler is a small Cython extension, so you need a C compiler (Xcode command
+line tools on macOS, `build-essential` on Debian and Ubuntu, the Visual Studio
+Build Tools on Windows). NumPy, Cython and the other build requirements are
+fetched automatically.
+
+```
+git clone https://github.com/progwriter/TMgen
+cd TMgen
+pip install .                 # or ".[plotting]" for the plotting helpers
+```
+
+The version number comes from the git tags, so clone the repository (a plain
+source archive of a release also works) rather than downloading a snapshot of a
+branch. To work on TMgen itself, see [DEVELOPMENT.md](DEVELOPMENT.md) for an
+editable install with the development tools.
 
 ## Documentation
 

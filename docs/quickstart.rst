@@ -4,16 +4,36 @@ Quickstart
 Installation
 ------------
 
+TMgen needs Python 3.11 or newer.
+
+From PyPI
+^^^^^^^^^
+
 ::
 
     pip install tmgen
 
-TMgen needs Python 3.11 or newer. Prebuilt wheels are published for common
-platforms; building from source needs a C compiler (the HMC sampler is a small
-Cython extension). The plotting helpers need matplotlib, which you can get with
+Prebuilt wheels are published for Linux, macOS and Windows, so no compiler is
+needed. The plotting helpers need matplotlib, which you can get with
 ``pip install "tmgen[plotting]"``.
 
-To work on TMgen itself, see ``DEVELOPMENT.md`` in the repository.
+From source
+^^^^^^^^^^^
+
+Use this for the latest unreleased changes. The HMC sampler is a small Cython
+extension, so you need a C compiler; NumPy, Cython and the other build
+requirements are fetched automatically.
+
+::
+
+    git clone https://github.com/progwriter/TMgen
+    cd TMgen
+    pip install .
+
+The version number comes from the git tags, so clone the repository rather than
+downloading a snapshot of a branch. To work on TMgen itself, see
+``DEVELOPMENT.md`` in the repository for an editable install with the
+development tools.
 
 Your first traffic matrix
 -------------------------
