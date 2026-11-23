@@ -91,7 +91,7 @@ def heatmap(tm: TrafficMatrix, epoch: int | None = None) -> None:
 def timeseries(tm: TrafficMatrix) -> None:
     """
     Plot the traffic matrix as timeseries. With epochs on the x-axis and volume
-    of the y-axis each line represents a single OD pair.
+    of the y-axis each line represents a single ingress-egress pair.
 
     :param tm: the traffic matrix to visualize
 

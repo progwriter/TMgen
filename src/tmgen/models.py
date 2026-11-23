@@ -1,3 +1,13 @@
+"""
+Traffic matrix generators.
+
+A matrix has ``num_nodes`` nodes and ``num_epochs`` time epochs. An *entry* is
+the traffic volume from an ingress node to an egress node in one epoch.
+``total_traffic`` is the sum of the entries of a matrix and ``mean_entry`` the
+mean of one entry. Every model generates traffic from a node to itself (the
+diagonal); remove it with :py:meth:`~tmgen.tm.TrafficMatrix.zero_diagonal`.
+"""
+
 import numpy
 from numpy.typing import ArrayLike, NDArray
 

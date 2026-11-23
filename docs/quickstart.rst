@@ -30,7 +30,7 @@ Example usage
 
 TMgen defines a ``TrafficMatrix`` object that is returned by all generator
 functions. Internally it contains a 3-d numpy array which contains volume of
-traffic between origin-destination pairs for different time epochs. For TM models
+traffic between ingress-egress pairs for different time epochs. For TM models
 that do not have a time component, the third dimension is of size 1.
 
 Quick overview on how to use them is given here,

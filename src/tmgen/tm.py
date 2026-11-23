@@ -171,7 +171,7 @@ class TrafficMatrix:
     def worst_case(self) -> "TrafficMatrix":
         """
         Return a new, single-epoch traffic matrix that chooses maximum volume
-        per OD pair (in time)
+        per ingress-egress pair (over time)
 
         :return: a new TrafficMatrix
         """
