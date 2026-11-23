@@ -62,6 +62,9 @@ The pre-commit hooks cover everything above except `pytest`. Notes:
 - A `docs` CI job builds the documentation with warnings as errors
   (`python -m sphinx -W --keep-going -b html docs docs/_build/html`) and
   uploads the HTML as an artifact.
+- Read the Docs builds the published documentation from `.readthedocs.yaml`:
+  it installs the package with the `docs` extra (`pip install -e ".[docs]"`
+  locally) and fails on warnings, like the `docs` CI job.
 - One test leg (Linux, Python 3.12) measures coverage and fails below the
   `fail_under` threshold in `pyproject.toml`. Run it locally with
   `pytest --cov`. The compiled `hmc` module cannot be traced, so it does not

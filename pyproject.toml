@@ -27,6 +27,7 @@ Homepage = "https://github.com/progwriter/TMgen"
 [project.optional-dependencies]
 plotting = ["matplotlib", "seaborn"]
 test = ["pytest"]
+docs = ["sphinx", "sphinx_rtd_theme", "matplotlib", "seaborn"]
 dev = [
     "pytest",
     "ruff",
