@@ -23,10 +23,10 @@ jobs:
       contents: read
       actions: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Release only from commits on the default branch
@@ -59,7 +59,7 @@ jobs:
       - name: Extract release notes from CHANGELOG.md
         if: github.ref_type == 'tag'
         run: python tools/release_notes.py extract --version "$GITHUB_REF_NAME" > release-notes.md
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: github.ref_type == 'tag'
         with:
           name: release-notes
@@ -68,16 +68,16 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install build twine
       - run: python -m build --sdist
       - run: twine check --strict dist/*
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: dist-sdist
           path: dist/*.tar.gz
@@ -89,11 +89,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: pypa/cibuildwheel@v4.3.5
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: dist-wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
@@ -108,7 +108,7 @@ jobs:
     permissions:
       id-token: write # trusted publishing, no API tokens
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: dist-*
           merge-multiple: true
@@ -123,7 +123,7 @@ jobs:
     needs: testpypi
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Install the tagged version from TestPyPI
@@ -158,7 +158,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: dist-*
           merge-multiple: true
@@ -171,7 +171,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: "{dist-*,release-notes}"
           merge-multiple: true
