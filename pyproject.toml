@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools-scm>=8", "wheel", "numpy", "cython>=3.0"]
+requires = ["setuptools>=77", "setuptools-scm>=8", "wheel", "numpy", "cython>=3.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +7,8 @@ name = "tmgen"
 dynamic = ["version"]
 description = "Library for network traffic matrix generation"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{name = "Victor Heorhiadi", email = "v@victorh.net"}]
 keywords = ["network", "traffic", "matrix"]
 requires-python = ">=3.11"
@@ -15,7 +16,6 @@ dependencies = ["numpy"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Topic :: System :: Networking",
     "Topic :: Software Development :: Libraries :: Python Modules",
