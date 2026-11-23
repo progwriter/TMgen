@@ -23,6 +23,10 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/progwriter/TMgen"
+Documentation = "https://tmgen.readthedocs.io/"
+Changelog = "https://github.com/progwriter/TMgen/blob/master/CHANGELOG.md"
+Issues = "https://github.com/progwriter/TMgen/issues"
+Source = "https://github.com/progwriter/TMgen"
 
 [project.optional-dependencies]
 plotting = ["matplotlib", "seaborn"]
