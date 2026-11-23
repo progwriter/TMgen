@@ -13,6 +13,7 @@ from tmgen.exceptions import TMgenException
 _Path = str | os.PathLike[str]
 
 FORMAT_VERSION = 1
+_CSV_COLUMNS = ("epoch", "ingress", "egress", "volume")
 
 
 _LEGACY_AGGREGATIONS: dict[str, str | None] = {
@@ -206,18 +207,78 @@ class TrafficMatrix:
 
     def to_csv(self, fname: _Path) -> None:
         """
-        Save the matrix to a CSV file.
+        Save the matrix to a CSV file in long format: a header line
+        ``epoch,ingress,egress,volume`` and one line per entry, which
+        :py:meth:`from_csv` reads back.
 
-        .. warning::
-            Note that if the matrix has more than one epoch, it will be "flattened".
-            In this case each line will have :math:`n^2` entries.
-            Each row is a single epoch with a flattened array of ingress-egress nodes.
+        :param fname: the file name
         """
-        if self.num_epochs() > 1:
-            m = self.matrix.reshape((self.num_nodes() ** 2, self.num_epochs())).T
-            numpy.savetxt(fname, m, delimiter=",")
-        else:
-            numpy.savetxt(fname, self.matrix[:, :, 0], delimiter=",")
+        epochs, ingress, egress = numpy.meshgrid(
+            numpy.arange(self.num_epochs()),
+            numpy.arange(self.num_nodes()),
+            numpy.arange(self.num_nodes()),
+            indexing="ij",
+        )
+        rows = numpy.column_stack(
+            [
+                epochs.ravel(),
+                ingress.ravel(),
+                egress.ravel(),
+                self.matrix.transpose(2, 0, 1).ravel(),
+            ]
+        )
+        numpy.savetxt(
+            fname,
+            rows,
+            delimiter=",",
+            header=",".join(_CSV_COLUMNS),
+            comments="",
+            fmt=["%d", "%d", "%d", "%.17g"],
+        )
+
+    @staticmethod
+    def from_csv(fname: _Path) -> "TrafficMatrix":
+        """
+        Load a traffic matrix from a long-format CSV file, as written by
+        :py:meth:`to_csv`. Every combination of epoch, ingress and egress
+        must appear exactly once.
+
+        :param fname: the file name on disk
+        :return: new TrafficMatrix
+        """
+        bad = TMgenException(
+            f"{fname} is not a traffic matrix CSV with the columns "
+            f"{','.join(_CSV_COLUMNS)}, one line per entry"
+        )
+        with open(fname) as f:
+            if f.readline().strip().split(",") != list(_CSV_COLUMNS):
+                raise bad
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)  # empty file
+                rows = numpy.loadtxt(fname, delimiter=",", skiprows=1, ndmin=2)
+        except ValueError as err:
+            raise bad from err
+        if rows.shape[1] != 4 or rows.shape[0] == 0:
+            raise bad
+        index = rows[:, :3]
+        if (index < 0).any() or (index != numpy.floor(index)).any():
+            raise bad
+        epoch, ingress, egress = index.astype(numpy.int64).T
+        num_nodes = int(max(ingress.max(), egress.max())) + 1
+        num_epochs = int(epoch.max()) + 1
+        entries = num_nodes * num_nodes * num_epochs
+        position = (epoch * num_nodes + ingress) * num_nodes + egress
+        if rows.shape[0] != entries or numpy.unique(position).size != entries:
+            raise TMgenException(
+                f"{fname} must have exactly one line for each of the {entries} "
+                f"combinations of {num_epochs} epochs and {num_nodes} nodes"
+            )
+        matrix = numpy.empty(entries)
+        matrix[position] = rows[:, 3]
+        return TrafficMatrix(
+            matrix.reshape((num_epochs, num_nodes, num_nodes)).transpose(1, 2, 0)
+        )
 
     def mean(self) -> "TrafficMatrix":
         """

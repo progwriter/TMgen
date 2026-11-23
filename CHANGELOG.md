@@ -85,8 +85,10 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 - Requires Python 3.11 or newer.
 - Package metadata and build requirements moved to `pyproject.toml`; the
   version is derived from git tags.
-- `TrafficMatrix.to_csv` writes one row per epoch (`n * n` columns) for
-  multi-epoch matrices, as documented, instead of one row per node pair.
+- `TrafficMatrix.to_csv` writes a long-format CSV (header
+  `epoch,ingress,egress,volume`, one line per entry) instead of an unlabeled
+  grid whose shape could not be recovered, and `TrafficMatrix.from_csv` reads
+  it back.
 
 ### Fixed
 

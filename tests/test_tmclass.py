@@ -19,13 +19,52 @@ def test_mean_and_worst_case() -> None:
     assert (tm.worst_case().matrix == 3).all()
 
 
-@pytest.mark.parametrize("epochs", [1, 3])
-def test_csv_shape(tmp_path: Path, epochs: int) -> None:
-    tm = TrafficMatrix(numpy.random.rand(2, 2, epochs))
-    f = tmp_path / "tm.csv"
-    tm.to_csv(str(f))
-    loaded = numpy.loadtxt(str(f), delimiter=",", ndmin=2)
-    assert loaded.shape == ((2, 2) if epochs == 1 else (epochs, 4))
+def test_csv_is_long_format(tmp_path: Path) -> None:
+    values = numpy.arange(8.0).reshape((2, 2, 2))
+    path = tmp_path / "tm.csv"
+    TrafficMatrix(values).to_csv(path)
+    lines = path.read_text().splitlines()
+    assert lines[0] == "epoch,ingress,egress,volume"
+    assert len(lines) == 1 + 8
+    assert lines[1] == "0,0,0,0"
+    assert lines[2] == "0,0,1,2"  # matrix[0, 1, 0]
+    assert lines[-1] == "1,1,1,7"
+
+
+@pytest.mark.parametrize("shape", [(1, 1, 1), (2, 2, 1), (3, 3, 4), (4, 4, 2)])
+def test_csv_round_trip(tmp_path: Path, shape: tuple[int, int, int]) -> None:
+    tm = TrafficMatrix(numpy.random.default_rng(0).random(shape))
+    path = tmp_path / "tm.csv"
+    tm.to_csv(path)
+    numpy.testing.assert_array_equal(TrafficMatrix.from_csv(path).matrix, tm.matrix)
+
+
+def test_csv_rows_in_any_order(tmp_path: Path) -> None:
+    path = tmp_path / "tm.csv"
+    path.write_text("epoch,ingress,egress,volume\n1,0,0,5\n0,0,0,3\n")
+    assert TrafficMatrix.from_csv(path).matrix.tolist() == [[[3.0, 5.0]]]
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "",
+        "a,b,c,d\n0,0,0,1\n",
+        "epoch,ingress,egress,volume\n",
+        "epoch,ingress,egress,volume\n0,0,0,x\n",
+        "epoch,ingress,egress,volume\n0,0,0\n",
+        "epoch,ingress,egress,volume\n0,0,0.5,1\n",
+        "epoch,ingress,egress,volume\n0,0,-1,1\n",
+        "epoch,ingress,egress,volume\n0,0,0,1\n0,0,0,2\n",
+        "epoch,ingress,egress,volume\n0,0,0,1\n0,1,1,2\n",
+        "epoch,ingress,egress,volume\n0,0,0,-1\n",
+    ],
+)
+def test_csv_rejects_malformed_files(tmp_path: Path, content: str) -> None:
+    path = tmp_path / "bad.csv"
+    path.write_text(content)
+    with pytest.raises(TMgenException):
+        TrafficMatrix.from_csv(path)
 
 
 def test_constructor_copies_its_input() -> None:
