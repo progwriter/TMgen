@@ -7,8 +7,8 @@ import pytest
 
 from tmgen.exceptions import TMgenException
 from tmgen.models import (
-    _peak_mean_cycle,
     _truncated_normal,
+    diurnal_profile,
     exact_tm,
     exp_tm,
     gravity_tm,
@@ -41,7 +41,11 @@ def test_modulated_gravity() -> None:
 def test_modulated_gravity_many_epochs() -> None:
     # regression test for #9: float epoch count broke numpy.linspace
     tm = modulated_gravity_tm(
-        num_nodes=14, num_epochs=24, total_traffic=3750, pm_ratio=1.5, t_ratio=0.75
+        num_nodes=14,
+        num_epochs=24,
+        total_traffic=3750,
+        peak_to_mean=1.5,
+        trough_to_mean=0.75,
     )
     assert tm.matrix.shape == (14, 14, 24)
 
@@ -143,12 +147,11 @@ def test_modulated_gravity_epoch_totals_follow_sinusoid(num_nodes: int) -> None:
         num_nodes,
         48,
         100.0,
-        pm_ratio=2,
-        t_ratio=1,
+        peak_to_mean=2,
         rng=0,
     )
     totals = tm.matrix.sum(axis=(0, 1))
-    expected = _peak_mean_cycle(1 / 24, 48, 100.0, 2, 1)
+    expected = diurnal_profile(48, 100.0, 2)
     numpy.testing.assert_allclose(totals, expected, atol=1e-9)
     assert totals.mean() == pytest.approx(100.0, rel=0.05)
 
@@ -181,7 +184,11 @@ def test_truncated_normal_zero_std_returns_clipped_mean() -> None:
 
 def test_modulated_gravity_temporal_variance_adds_noise() -> None:
     kwargs: dict[str, Any] = dict(
-        num_nodes=4, num_epochs=2000, total_traffic=1000.0, pm_ratio=1.5, t_ratio=1.0
+        num_nodes=4,
+        num_epochs=2000,
+        total_traffic=1000.0,
+        peak_to_mean=1.5,
+        trough_to_mean=1.0,
     )
     quiet = modulated_gravity_tm(
         spatial_variance=0, temporal_variance=0, rng=0, **kwargs
@@ -319,8 +326,13 @@ def test_equal_bounds_and_integral_floats_are_accepted() -> None:
 _RENAMES: list[tuple[Callable[..., TrafficMatrix], dict[str, Any], dict[str, Any]]] = [
     (
         lambda **kw: modulated_gravity_tm(3, rng=0, **kw),
-        {"num_tms": 4, "mean_traffic": 5.0},
-        {"num_epochs": 4, "total_traffic": 5.0},
+        {"num_tms": 4, "mean_traffic": 5.0, "pm_ratio": 1.2, "t_ratio": 0.9},
+        {
+            "num_epochs": 4,
+            "total_traffic": 5.0,
+            "peak_to_mean": 1.2,
+            "trough_to_mean": 0.9,
+        },
     ),
     (
         lambda **kw: random_gravity_tm(3, rng=0, **kw),
@@ -348,3 +360,67 @@ def test_old_parameter_names_still_work_but_warn(
     with pytest.warns(DeprecationWarning, match="is deprecated, use"):
         from_old = call(**old)
     numpy.testing.assert_array_equal(from_old.matrix, call(**new).matrix)
+
+
+def test_default_cycle_is_symmetric_like_the_paper() -> None:
+    # Fig. 2: peak-to-mean 1.5 swings between 50 and 150 around a mean of 100
+    cycle = diurnal_profile(96, 100.0, peak_to_mean=1.5, diurnal_freq=1 / 96)
+    assert cycle[0] == pytest.approx(100.0)
+    assert cycle.max() == pytest.approx(150.0, rel=1e-3)
+    assert cycle.min() == pytest.approx(50.0, rel=1e-3)
+    assert cycle.mean() == pytest.approx(100.0)
+
+
+def test_peak_to_mean_two_touches_zero() -> None:
+    cycle = diurnal_profile(96, 100.0, peak_to_mean=2, diurnal_freq=1 / 96)
+    assert cycle.max() == pytest.approx(200.0, rel=1e-3)
+    assert cycle.min() == pytest.approx(0.0, abs=0.1)
+
+
+def test_trough_to_mean_is_the_lowest_value_over_the_mean() -> None:
+    cycle = diurnal_profile(
+        96, 10.0, peak_to_mean=1.5, trough_to_mean=0.75, diurnal_freq=1 / 96
+    )
+    assert cycle.max() == pytest.approx(15.0, rel=1e-3)
+    assert cycle.min() == pytest.approx(7.5, rel=1e-3)
+    assert (cycle[cycle < 10.0] < 10.0).all()
+    # an asymmetric cycle does not average to the mean
+    assert cycle.mean() != pytest.approx(10.0, rel=1e-3)
+
+
+def test_peak_to_mean_one_is_flat() -> None:
+    assert (diurnal_profile(10, 5.0, peak_to_mean=1) == 5.0).all()
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"peak_to_mean": 0.5},
+        {"peak_to_mean": 2.5},
+        {"peak_to_mean": 1.5, "trough_to_mean": 1.5},
+        {"peak_to_mean": 1.5, "trough_to_mean": -0.1},
+        {"num_epochs": 0},
+        {"mean": -1.0},
+        {"diurnal_freq": float("nan")},
+    ],
+)
+def test_diurnal_profile_rejects_invalid_arguments(kwargs: dict[str, Any]) -> None:
+    args: dict[str, Any] = {"num_epochs": 24, "mean": 1.0}
+    args.update(kwargs)
+    with pytest.raises(TMgenException):
+        diurnal_profile(**args)
+
+
+def test_asymmetric_peak_above_two_is_allowed_with_a_trough() -> None:
+    cycle = diurnal_profile(
+        96, 1.0, peak_to_mean=3, trough_to_mean=0, diurnal_freq=1 / 96
+    )
+    assert cycle.min() >= 0
+    assert cycle.max() == pytest.approx(3.0, rel=1e-3)
+
+
+def test_modulated_gravity_default_cycle_stays_around_the_total() -> None:
+    tm = modulated_gravity_tm(4, 96, 100.0, diurnal_freq=1 / 96, rng=0)
+    totals = tm.matrix.sum(axis=(0, 1))
+    assert totals.min() == pytest.approx(50.0, rel=1e-2)
+    assert totals.max() == pytest.approx(150.0, rel=1e-2)

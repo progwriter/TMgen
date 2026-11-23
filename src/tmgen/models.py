@@ -97,65 +97,70 @@ def _truncated_normal(
     return numpy.clip(mean + std * out, 0, None)
 
 
-def _peak_mean_cycle(
-    freq: float,
-    n: int,
+def diurnal_profile(
+    num_epochs: int,
     mean: float,
-    peak_to_mean: float,
-    trough_to_mean: float = numpy.nan,
+    peak_to_mean: float = 1.5,
+    trough_to_mean: float | None = None,
+    diurnal_freq: float = 1 / 24,
 ) -> NDArray[numpy.float64]:
     """
-    Generate a simple sinusoid with specified frequency, length, mean,
-    peak-to-mean ratio, and trough_to_mean ratio.
+    A daily cycle: a sinusoid that starts at *mean* and rises, with the given
+    peak and trough relative to *mean*.
 
-    The generated signal has the form
-    :math:`x = mean*(peaktomean-1)*sin(2*\\pi*freq*linspace(0,1,N))+mean`
+    By default the cycle is symmetric, so a peak-to-mean ratio of 1.5 gives a
+    trough-to-mean ratio of 0.5 (values from 0.5 to 1.5 times *mean*, as in
+    Fig. 2 of Tune and Roughan, SIGCOMM 2015). Pass *trough_to_mean* for a
+    cycle that dips less (or more) than it peaks. The average over whole
+    cycles is *mean* only for a symmetric cycle.
 
-    Note that if the mean m is 0, then
-    :math:`x = peakmean*sin(2*\\pi*freq*linspace(0,1,N))`
+    Use it as the *profile* of :py:meth:`~tmgen.tm.TrafficMatrix.modulate`
+    (with ``mean=1``), or to build your own total traffic.
 
-    Intervals of x below the mean have a drawdown determined by trough_to_mean.
-
-    ..note
-        the trough-to-mean ratio must be less than or equal to the
-        peak-to-mean ratio.
-
-    :param freq: frequency
-    :param n: number of samples
-    :param mean: mean value
-    :param peak_to_mean: ratio of peak to mean. Must be >= 1 (1 resulting
-        in a constant, flatlined signal)
-    :param trough_to_mean: ratio of through to mean
-    :return: numpy array containing the y-values for the sinusoid
+    :param num_epochs: number of epochs (samples) to generate
+    :param mean: the level the cycle oscillates around
+    :param peak_to_mean: the highest value divided by *mean*; at least 1 (1 is
+        a constant signal)
+    :param trough_to_mean: the lowest value divided by *mean*, between 0 and 1.
+        Default ``2 - peak_to_mean``, the symmetric cycle, which requires
+        *peak_to_mean* of at most 2
+    :param diurnal_freq: cycles per epoch. The default, 1/24, is one cycle per
+        24 epochs, i.e. hourly epochs over a day
+    :return: an array with one value per epoch
     """
-    # sanity checks
-    if peak_to_mean < 1:
-        raise TMgenException("Peak-to-mean ratio must be greater than or equal to 1")
-    # Generate the basic sinusoid
-    base = numpy.sin(2 * numpy.pi * freq * numpy.linspace(0, n - 1, n))
-    # If mean is 0, simply return scaled sinusoid
-    if mean == 0:
-        return peak_to_mean * base
-    x = mean * (peak_to_mean - 1) * base + mean
-    if not numpy.isnan(trough_to_mean):
-        if trough_to_mean > peak_to_mean:
+    num_epochs = _count(num_epochs, "num_epochs")
+    mean = _number(mean, "mean")
+    peak_to_mean = _number(peak_to_mean, "peak_to_mean", minimum=1)
+    diurnal_freq = _number(diurnal_freq, "diurnal_freq", minimum=None)
+    if trough_to_mean is None:
+        if peak_to_mean > 2:
             raise TMgenException(
-                "Trough-to-mean ratio must be less than or equal to peak-to-mean ratio"
+                "A symmetric cycle needs a peak_to_mean of at most 2 (its trough "
+                "would be negative); pass trough_to_mean for a different shape"
             )
-        if trough_to_mean == 1:
-            return x  # no effect on trough
-        y = mean * (trough_to_mean - 1) * base + mean
-        x[x < mean] = y[x < mean]
-    return x
+        trough_to_mean = 2 - peak_to_mean
+    trough_to_mean = _number(trough_to_mean, "trough_to_mean")
+    if trough_to_mean > 1:
+        raise TMgenException(
+            f"trough_to_mean must be at most 1, got {trough_to_mean:g}"
+        )
+    wave = numpy.sin(2 * numpy.pi * diurnal_freq * numpy.arange(num_epochs))
+    amplitude = numpy.where(wave >= 0, peak_to_mean - 1, 1 - trough_to_mean)
+    return mean * (1 + amplitude * wave)
 
 
-@renamed_arguments(num_tms="num_epochs", mean_traffic="total_traffic")
+@renamed_arguments(
+    num_tms="num_epochs",
+    mean_traffic="total_traffic",
+    pm_ratio="peak_to_mean",
+    t_ratio="trough_to_mean",
+)
 def modulated_gravity_tm(
     num_nodes: int,
     num_epochs: int,
     total_traffic: float,
-    pm_ratio: float = 1.5,
-    t_ratio: float = 0.75,
+    peak_to_mean: float = 1.5,
+    trough_to_mean: float | None = None,
     diurnal_freq: float = 1 / 24,
     spatial_variance: float = 0,
     temporal_variance: float = 0,
@@ -165,7 +170,8 @@ def modulated_gravity_tm(
     """
     Generate a modulated gravity traffic matrix (Tune and Roughan, SIGCOMM 2015).
 
-    The total traffic follows a sinusoidal cycle with mean *total_traffic*.
+    The total traffic follows a daily cycle (see :py:func:`diurnal_profile`)
+    around *total_traffic*.
     Each epoch is :math:`X(t) = T\\, u\\, u^T p(t)`, where :math:`T` is the mean
     total, :math:`u` holds each node's share of the traffic and :math:`p(t)`
     the relative volume at time :math:`t`. Both are drawn from normal
@@ -175,13 +181,14 @@ def modulated_gravity_tm(
 
     :param num_nodes: number of nodes in the network
     :param num_epochs: number of time epochs (matrices) to generate
-    :param total_traffic: the total volume of traffic in a matrix, averaged
-        over the epochs
-    :param pm_ratio: peak-to-mean ratio. Peak traffic will be larger by
-        this much (must be bigger than 1). Default is 1.5
-    :param t_ratio: trough-to-mean ratio. Default is 0.75
-    :param diurnal_freq: Frequency of modulation. Default is 1/24 (i.e., hourly)
-        if you are generating multi-day TMs
+    :param total_traffic: the level the total volume of traffic in a matrix
+        oscillates around (its average over whole cycles for a symmetric cycle)
+    :param peak_to_mean: highest total traffic divided by *total_traffic*; at
+        least 1. Default is 1.5
+    :param trough_to_mean: lowest total traffic divided by *total_traffic*,
+        between 0 and 1. Default is symmetric, ``2 - peak_to_mean``
+    :param diurnal_freq: cycles per epoch. The default, 1/24, is one cycle per
+        24 epochs, i.e. hourly epochs over a day
     :param spatial_variance: Variance of each node's traffic, in squared
         traffic units. Each share of the mean traffic then has a standard
         deviation of ``sqrt(spatial_variance) / total_traffic``. The default,
@@ -203,12 +210,10 @@ def modulated_gravity_tm(
     temporal_variance = _number(temporal_variance, "temporal_variance")
     gen = _resolve_rng(rng)
 
-    total = _peak_mean_cycle(diurnal_freq, num_epochs, total_traffic, pm_ratio, t_ratio)
-    if numpy.min(total) < 0:
-        total = total + numpy.absolute(numpy.min(total))
+    total = diurnal_profile(
+        num_epochs, total_traffic, peak_to_mean, trough_to_mean, diurnal_freq
+    )
     mean_total = float(numpy.mean(total))
-    if mean_total <= 0:
-        raise TMgenException("The mean traffic must be positive")
 
     shares = gen.random(num_nodes)
     shares /= shares.sum()
@@ -450,6 +455,7 @@ def exact_tm(num_nodes: int, value: float, num_epochs: int = 1) -> TrafficMatrix
 
 __all__ = [
     "RngLike",
+    "diurnal_profile",
     "modulated_gravity_tm",
     "random_gravity_tm",
     "gravity_tm",

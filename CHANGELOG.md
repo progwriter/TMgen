@@ -12,6 +12,8 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Added
 
+- `tmgen.models.diurnal_profile`, the daily cycle used by `modulated_gravity_tm`,
+  to build total-traffic series or to pass to `TrafficMatrix.modulate`.
 - `tmgen.hmc` and `tmgen.TMgenException` are available from the top-level
   package, and `tmgen.plot` can be used as `tmgen.plot` without importing it
   first (matplotlib is only imported when it is used). `tmgen.__all__` lists
@@ -36,6 +38,12 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- `modulated_gravity_tm` takes `peak_to_mean` and `trough_to_mean` (were
+  `pm_ratio` and `t_ratio`; the old keywords still work with a
+  `DeprecationWarning`). `trough_to_mean` now defaults to `None`, a symmetric
+  cycle as in the paper (`peak_to_mean=1.5` swings between 0.5 and 1.5 times
+  the mean), where `t_ratio` used to default to 0.75. A symmetric cycle needs
+  `peak_to_mean <= 2`; the old code shifted a negative cycle upward instead.
 - The package no longer ships `.pxd` files (`hmc.pxd`, and an `__init__.pxd`
   that cimported a module that no longer exists), so `cimport tmgen...` is not
   supported and downstream Cython code does not need NumPy at build time.
@@ -114,6 +122,10 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Fixed
 
+- The trough of the `modulated_gravity_tm` cycle was inverted: with the default
+  `t_ratio=0.75` the "trough" stayed above the mean (values from 1.0 to 1.5
+  times the mean, averaging 1.24). `trough_to_mean` is now the lowest value
+  divided by the mean.
 - `hmc_sample` looped forever on degenerate constraints that every candidate
   sample violates; it now raises `TMgenException` after 1000 consecutive
   rejections.
