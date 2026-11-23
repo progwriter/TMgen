@@ -78,10 +78,10 @@ array([[...]])
 
 Or the values between any node pair, with a particular aggregation metric:
 
->>> tm.between(0,2,'all') # doctest: +ELLIPSIS
+>>> tm.between(0, 2) # doctest: +ELLIPSIS
 array([...])
->>> tm.between(0,2,'max') # doctest: +SKIP
->>> tm.between(0,2,'mean') # doctest: +SKIP
+>>> tm.between(0, 2, 'max') # doctest: +SKIP
+>>> tm.between(0, 2, 'mean') # doctest: +SKIP
 
 See :ref:`API` for all supported functions.
 

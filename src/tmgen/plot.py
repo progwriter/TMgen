@@ -115,6 +115,6 @@ def timeseries(tm: TrafficMatrix) -> None:
     n = tm.num_nodes()
     for i in range(n):
         for e in range(n):
-            plt.plot(tm.between(i, e, "all"))
+            plt.plot(tm.between(i, e))
     plt.xlabel("Epoch")
     plt.ylabel("Volume")

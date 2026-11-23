@@ -1,25 +1,40 @@
 import os
 import pickle
+import warnings
+from typing import Literal, overload
 
 import numpy
 from numpy.typing import ArrayLike, NDArray
 
+from tmgen._compat import renamed_arguments
 from tmgen.exceptions import TMgenException
 
 _Path = str | os.PathLike[str]
 
 
-def _canonical_mode(m: str) -> str:
-    m = m.lower()
-    if m in ("all", "*"):
-        return "all"
-    if m in ("min", "mininum"):
-        return "min"
-    if m in ("max", "maximum"):
-        return "max"
-    if m in ("mean", "average"):
-        return "mean"
-    raise TMgenException("Unknown entry choice mode")
+_LEGACY_AGGREGATIONS: dict[str, str | None] = {
+    "all": None,
+    "*": None,
+    "min": "min",
+    "mininum": "min",
+    "max": "max",
+    "maximum": "max",
+    "mean": "mean",
+    "average": "mean",
+}
+
+
+def _aggregation(agg: str | None) -> str | None:
+    if agg is None or agg in ("min", "max", "mean"):
+        return agg
+    if isinstance(agg, str) and agg.lower() in _LEGACY_AGGREGATIONS:
+        warnings.warn(
+            f"agg={agg!r} is deprecated, use None, 'min', 'max' or 'mean'",
+            DeprecationWarning,
+            stacklevel=4,  # the caller of between(), which is wrapped
+        )
+        return _LEGACY_AGGREGATIONS[agg.lower()]
+    raise TMgenException(f"agg must be None, 'min', 'max' or 'mean', got {agg!r}")
 
 
 class TrafficMatrix:
@@ -88,22 +103,33 @@ class TrafficMatrix:
         """
         return self.matrix[:, :, t]
 
+    @overload
     def between(
-        self, o: int, d: int, modestr: str = "all"
+        self, ingress: int, egress: int, agg: None = None
+    ) -> NDArray[numpy.float64]: ...
+
+    @overload
+    def between(
+        self, ingress: int, egress: int, agg: Literal["min", "max", "mean"]
+    ) -> float: ...
+
+    @renamed_arguments(o="ingress", d="egress", modestr="agg")
+    def between(
+        self, ingress: int, egress: int, agg: str | None = None
     ) -> NDArray[numpy.float64] | float:
         """
-        Return the traffic matrix between the given ingress and egress nodes.
-        This method supports multiple temporal modes: 'all', 'min', 'max', and
-        'mean'
+        Return the traffic volumes from the ingress node to the egress node.
 
-        :param o: source node (origin)
-        :param d: destination node
-        :param modestr: temporal mode
-        :return: Numpy array if modestr=='all', double otherwise
+        :param ingress: ingress (source) node
+        :param egress: egress (destination) node
+        :param agg: ``None`` for the volume at each epoch (a read-only array),
+            or ``"min"``, ``"max"`` or ``"mean"`` to aggregate over the epochs
+            into a single number
+        :return: an array with one volume per epoch, or the aggregate
         """
-        mode = _canonical_mode(modestr)
-        series = self.matrix[o, d, :]
-        if mode == "all":
+        mode = _aggregation(agg)
+        series = self.matrix[ingress, egress, :]
+        if mode is None:
             return series
         if mode == "min":
             return float(numpy.min(series))

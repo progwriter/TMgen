@@ -24,6 +24,12 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- `TrafficMatrix.between(ingress, egress, agg=None)` replaces
+  `between(o, d, modestr='all')`: `agg` is `None` for the series over the
+  epochs, or `'min'`, `'max'` or `'mean'` for a single number, and the return
+  type follows from it. The old keywords and the old string modes (`'all'`,
+  `'*'`, `'maximum'`, `'average'`, and the misspelled `'mininum'`) still work
+  with a `DeprecationWarning`.
 - Parameters are named consistently: `num_epochs` everywhere (was `num_tms` in
   `modulated_gravity_tm`); `total_traffic` for the total of a matrix
   (`modulated_gravity_tm`, `random_gravity_tm`, `gravity_tm`); `mean_entry` for

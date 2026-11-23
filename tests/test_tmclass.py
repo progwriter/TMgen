@@ -118,3 +118,41 @@ def test_zero_diagonal() -> None:
 
 def test_zero_diagonal_of_a_single_node() -> None:
     assert not TrafficMatrix(numpy.ones((1, 1, 2))).zero_diagonal().matrix.any()
+
+
+def _series_tm() -> TrafficMatrix:
+    values = numpy.zeros((3, 3, 4))
+    values[0, 2, :] = [4.0, 1.0, 3.0, 2.0]
+    return TrafficMatrix(values)
+
+
+def test_between_returns_the_series_or_an_aggregate() -> None:
+    tm = _series_tm()
+    numpy.testing.assert_array_equal(tm.between(0, 2), [4, 1, 3, 2])
+    assert tm.between(0, 2, "min") == 1.0
+    assert tm.between(0, 2, "max") == 4.0
+    assert tm.between(0, 2, "mean") == 2.5
+    assert tm.between(2, 0, agg="max") == 0.0
+
+
+@pytest.mark.parametrize(
+    ("legacy", "expected"),
+    [("all", [4, 1, 3, 2]), ("*", [4, 1, 3, 2]), ("MAX", 4.0), ("maximum", 4.0)]
+    + [("mininum", 1.0), ("average", 2.5)],
+)
+def test_between_legacy_modes_warn(legacy: str, expected: object) -> None:
+    with pytest.warns(DeprecationWarning, match="deprecated") as record:
+        result = _series_tm().between(0, 2, legacy)  # type: ignore[call-overload]
+    numpy.testing.assert_array_equal(result, expected)
+    assert record[0].filename == __file__
+
+
+def test_between_old_keyword_names_warn() -> None:
+    with pytest.warns(DeprecationWarning):
+        assert _series_tm().between(o=0, d=2, modestr="max") == 4.0  # type: ignore[call-overload]
+
+
+@pytest.mark.parametrize("bad", ["median", "", 3])
+def test_between_unknown_aggregation_raises(bad: object) -> None:
+    with pytest.raises(TMgenException, match="agg"):
+        _series_tm().between(0, 2, bad)  # type: ignore[call-overload]
