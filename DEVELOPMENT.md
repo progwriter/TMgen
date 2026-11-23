@@ -62,6 +62,10 @@ The pre-commit hooks cover everything above except `pytest`. Notes:
 - A `docs` CI job builds the documentation with warnings as errors
   (`python -m sphinx -W --keep-going -b html docs docs/_build/html`) and
   uploads the HTML as an artifact.
+- Dependabot (`.github/dependabot.yml`) opens one pull request a week for
+  outdated GitHub Actions and one a month for Python dependency ranges, with
+  `ci:` and `build:` commit prefixes. CI runs on them like any other pull
+  request, so merge them when it is green.
 - Read the Docs builds the published documentation from `.readthedocs.yaml`:
   it installs the package with the `docs` extra (`pip install -e ".[docs]"`
   locally) and fails on warnings, like the `docs` CI job.
