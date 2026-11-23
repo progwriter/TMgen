@@ -190,6 +190,18 @@ cycle; any array of non-negative numbers works as well.
 >>> day.shape
 (3, 3, 24)
 
+For a cycle with more than one rhythm, :py:func:`~tmgen.models.fourier_profile`
+adds components given as ``(frequency, amplitude, phase)``, with the frequency
+in cycles per epoch. Here a daily cycle plus a weaker twice-daily one (hourly
+epochs over two days):
+
+>>> import numpy
+>>> from tmgen.models import fourier_profile, modulated_gravity_tm
+>>> total = fourier_profile(48, 100.0, [(1 / 24, 30.0, 0.0), (1 / 12, 10.0, 1.0)])
+>>> tm = modulated_gravity_tm(num_nodes=5, num_epochs=48, total_traffic=100, profile=total, rng=1)
+>>> numpy.allclose(tm.matrix.sum(axis=(0, 1)), total)
+True
+
 To follow a measured series of total traffic, divide it by the total of your
 spatial matrix:
 

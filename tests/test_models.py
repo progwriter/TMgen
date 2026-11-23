@@ -11,6 +11,7 @@ from tmgen.models import (
     diurnal_profile,
     exact_tm,
     exp_tm,
+    fourier_profile,
     gravity_tm,
     lognormal_tm,
     modulated_gravity_tm,
@@ -461,3 +462,39 @@ def test_default_rng_is_numpys_global_legacy_stream() -> None:
     numpy.random.seed(5)
     direct = numpy.random.exponential(7.0, size=(3, 3, 2))
     numpy.testing.assert_array_equal(model.matrix, direct)
+
+
+def test_fourier_profile_adds_the_harmonics_to_the_mean() -> None:
+    profile = fourier_profile(48, 10.0, [(1 / 24, 4.0, 0.0), (1 / 12, 1.0, numpy.pi)])
+    epochs = numpy.arange(48)
+    expected = (
+        10.0
+        + 4 * numpy.cos(2 * numpy.pi * epochs / 24)
+        - numpy.cos(2 * numpy.pi * epochs / 12)
+    )
+    numpy.testing.assert_allclose(profile, expected)
+    assert profile.mean() == pytest.approx(10.0)
+
+
+def test_fourier_profile_without_harmonics_is_constant() -> None:
+    numpy.testing.assert_array_equal(fourier_profile(5, 3.0, []), numpy.full(5, 3.0))
+
+
+def test_fourier_profile_rejects_a_negative_profile() -> None:
+    with pytest.raises(TMgenException, match="negative"):
+        fourier_profile(24, 1.0, [(1 / 24, 2.0, 0.0)])
+
+
+def test_modulated_gravity_follows_a_given_profile() -> None:
+    profile = fourier_profile(24, 100.0, [(1 / 24, 30.0, 0.0)])
+    tm = modulated_gravity_tm(5, 24, 1.0, profile=profile, rng=0)
+    numpy.testing.assert_allclose(tm.matrix.sum(axis=(0, 1)), profile)
+
+
+@pytest.mark.parametrize(
+    "profile",
+    [numpy.ones(5), numpy.full(6, -1.0), numpy.zeros(6), numpy.full(6, numpy.nan)],
+)
+def test_modulated_gravity_rejects_a_bad_profile(profile: Any) -> None:
+    with pytest.raises(TMgenException):
+        modulated_gravity_tm(3, 6, 1.0, profile=profile)

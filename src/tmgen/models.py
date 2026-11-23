@@ -8,6 +8,7 @@ mean of one entry. Every model generates traffic from a node to itself (the
 diagonal); remove it with :py:meth:`~tmgen.tm.TrafficMatrix.zero_diagonal`.
 """
 
+from collections.abc import Sequence
 from typing import Any
 
 import numpy
@@ -155,6 +156,46 @@ def diurnal_profile(
     return profile
 
 
+def fourier_profile(
+    num_epochs: int,
+    mean: float,
+    harmonics: Sequence[tuple[float, float, float]],
+) -> NDArray[numpy.float64]:
+    """
+    A cyclical profile built from a few Fourier components, the temporal
+    constraint of eq. 8 of Tune and Roughan (SIGCOMM 2015).
+
+    The value at epoch :math:`t` is :math:`m + \\sum_h a_h \\cos(2\\pi f_h t +
+    \\phi_h)`. Choose the components to match the cycles of real traffic, for
+    example the strongest ones of a measured total (daily, weekly, ...).
+
+    :param num_epochs: number of epochs (samples) to generate
+    :param mean: the level the profile oscillates around, :math:`m`
+    :param harmonics: ``(frequency, amplitude, phase)`` triples: the frequency
+        in cycles per epoch, the amplitude in the units of *mean* and the
+        phase in radians
+    :return: an array with one value per epoch
+    :raises TMgenException: if the profile would be negative in some epoch
+    """
+    num_epochs = _count(num_epochs, "num_epochs")
+    mean = _number(mean, "mean")
+    epochs = numpy.arange(num_epochs)
+    profile: NDArray[numpy.float64] = numpy.full(num_epochs, mean)
+    for frequency, amplitude, phase in harmonics:
+        frequency = _number(frequency, "frequency", minimum=None)
+        amplitude = _number(amplitude, "amplitude", minimum=None)
+        phase = _number(phase, "phase", minimum=None)
+        profile = profile + amplitude * numpy.cos(
+            2 * numpy.pi * frequency * epochs + phase
+        )
+    if profile.min() < 0:
+        raise TMgenException(
+            f"The profile goes negative (minimum {profile.min():g}); "
+            "lower the amplitudes or raise mean"
+        )
+    return profile
+
+
 @renamed_arguments(
     num_tms="num_epochs",
     mean_traffic="total_traffic",
@@ -172,6 +213,7 @@ def modulated_gravity_tm(
     temporal_variance: float = 0,
     *,
     symmetric: bool = False,
+    profile: ArrayLike | None = None,
     rng: RngLike = None,
 ) -> TrafficMatrix:
     """
@@ -206,23 +248,39 @@ def modulated_gravity_tm(
         in squared traffic units. The default, 0, follows the cycle exactly
     :param symmetric: use the same shares for ingress and egress, which makes
         every matrix symmetric. By default they are drawn independently
+    :param profile: the mean total traffic of each epoch, one value per epoch
+        (for example from :py:func:`fourier_profile`). It replaces the daily
+        cycle, so *total_traffic*, *peak_to_mean*, *trough_to_mean* and
+        *diurnal_freq* are ignored
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: a new :py:class:`~TrafficMatrix`
     """
     num_nodes = _count(num_nodes, "num_nodes")
     num_epochs = _count(num_epochs, "num_epochs")
     total_traffic = _number(total_traffic, "total_traffic")
-    if total_traffic == 0:
+    if total_traffic == 0 and profile is None:
         raise TMgenException("total_traffic must be positive")
     diurnal_freq = _number(diurnal_freq, "diurnal_freq", minimum=None)
     spatial_variance = _number(spatial_variance, "spatial_variance")
     temporal_variance = _number(temporal_variance, "temporal_variance")
     gen = _resolve_rng(rng)
 
-    total = diurnal_profile(
-        num_epochs, total_traffic, peak_to_mean, trough_to_mean, diurnal_freq
-    )
+    if profile is None:
+        total = diurnal_profile(
+            num_epochs, total_traffic, peak_to_mean, trough_to_mean, diurnal_freq
+        )
+    else:
+        total = numpy.asarray(profile, dtype=numpy.float64)
+        if total.shape != (num_epochs,):
+            raise TMgenException(
+                f"profile needs one value per epoch ({num_epochs}), got shape "
+                f"{total.shape}"
+            )
+        if not numpy.isfinite(total).all() or (total < 0).any():
+            raise TMgenException("profile must be finite and non-negative")
     mean_total = float(numpy.mean(total))
+    if mean_total == 0:
+        raise TMgenException("profile must have a positive mean")
 
     def node_shares() -> NDArray[numpy.float64]:
         shares = gen.random(num_nodes)

@@ -10,6 +10,11 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ## [Unreleased]
 
+### Added
+
+- `fourier_profile`: a cyclical profile built from Fourier components (eq. 8 of the paper).
+- `modulated_gravity_tm(profile=...)` takes the mean total traffic of every epoch, for example from `fourier_profile`, instead of the daily cycle.
+
 ## [0.2.0] - 2026-11-23
 
 ### Added
