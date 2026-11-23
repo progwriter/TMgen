@@ -10,6 +10,8 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-23
+
 ### Added
 
 - `tmgen.models.diurnal_profile`, the daily cycle used by `modulated_gravity_tm`,
