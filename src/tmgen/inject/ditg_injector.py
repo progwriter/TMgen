@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import signal
 import sys
 import time
@@ -37,7 +38,7 @@ class DITGinjector(InjectorBase):
 
     def __init__(
         self,
-        tm_fname: str,
+        tm_fname: str | os.PathLike[str],
         epoch_length: float,
         ID: int,
         destinations: dict[str, list[str]],

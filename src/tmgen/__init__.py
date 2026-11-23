@@ -1,15 +1,16 @@
-import importlib
-from importlib.metadata import version
-from typing import TYPE_CHECKING, Any
+import importlib as _importlib
+from importlib import metadata as _metadata
+from typing import TYPE_CHECKING as _TYPE_CHECKING
+from typing import Any as _Any
 
 from tmgen import hmc, models
 from tmgen.exceptions import TMgenException
 from tmgen.tm import TrafficMatrix
 
-if TYPE_CHECKING:
+if _TYPE_CHECKING:
     from tmgen import plot
 
-__version__ = version("tmgen")
+__version__ = _metadata.version("tmgen")
 
 __all__ = [
     "TMgenException",
@@ -21,8 +22,12 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str) -> Any:
+def __dir__() -> list[str]:
+    return sorted(__all__)
+
+
+def __getattr__(name: str) -> _Any:
     # plotting needs the optional matplotlib dependency, so import it on use
     if name == "plot":
-        return importlib.import_module("tmgen.plot")
+        return _importlib.import_module("tmgen.plot")
     raise AttributeError(f"module 'tmgen' has no attribute {name!r}")

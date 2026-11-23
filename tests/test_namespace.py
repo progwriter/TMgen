@@ -34,3 +34,7 @@ def test_plot_is_not_imported_with_the_package() -> None:
 def test_plot_is_available_on_demand() -> None:
     pytest.importorskip("matplotlib")
     assert tmgen.plot.heatmap is not None
+
+
+def test_dir_lists_only_the_public_names() -> None:
+    assert dir(tmgen) == sorted(tmgen.__all__)
