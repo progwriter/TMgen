@@ -1,5 +1,4 @@
 import importlib
-import warnings
 from types import ModuleType
 
 import numpy as np
@@ -10,21 +9,15 @@ from tmgen.tm import TrafficMatrix
 seaborn: ModuleType | None
 try:
     seaborn = importlib.import_module("seaborn")
-    seaborn.set(style="white")
 except ImportError:
-    seaborn = None
-    warnings.warn(
-        "Please consider installing seaborn package for prettier graphs",
-        stacklevel=2,
-    )
+    seaborn = None  # optional: plain matplotlib is used instead
 try:
     from matplotlib import pyplot as plt
     from matplotlib.axes import Axes
 except ImportError as e:
-    warnings.warn(
-        "Plotting functionality requires the matplotlib library", stacklevel=2
-    )
-    raise e
+    raise ImportError(
+        'tmgen.plot needs matplotlib: pip install "tmgen[plotting]"'
+    ) from e
 
 
 def _matplotlib_heatmap(matrix: NDArray[np.float64], ax: Axes) -> None:

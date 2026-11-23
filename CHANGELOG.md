@@ -126,6 +126,10 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Fixed
 
+- Importing `tmgen.plot` no longer changes the global seaborn and matplotlib
+  style, and no longer warns when seaborn is missing (plain matplotlib is
+  used). A missing matplotlib raises an `ImportError` that names the extra to
+  install.
 - `tmgen.plot.heatmap` with seaborn raised `TypeError` for multi-epoch matrices of
   more than 10 epochs (the tick label step was a float).
 - The trough of the `modulated_gravity_tm` cycle was inverted: with the default

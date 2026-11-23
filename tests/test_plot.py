@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from collections.abc import Iterator
 
 import numpy
@@ -64,3 +66,32 @@ def test_heatmap_of_many_epochs_labels_every_tenth() -> None:
     pytest.importorskip("seaborn")
     ax = plot.heatmap(TrafficMatrix(numpy.random.rand(3, 3, 24)))
     assert len(ax.get_xticks()) == 12
+
+
+def _run(code: str) -> str:
+    out = subprocess.run(
+        [sys.executable, "-W", "error", "-c", code],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return out.stdout.strip()
+
+
+def test_importing_plot_leaves_the_matplotlib_style_alone() -> None:
+    code = (
+        "import matplotlib; before = dict(matplotlib.rcParams); "
+        "import tmgen.plot; print(before == dict(matplotlib.rcParams))"
+    )
+    assert _run(code) == "True"
+
+
+def test_plot_works_without_seaborn_and_without_warnings() -> None:
+    # a None entry in sys.modules makes "import seaborn" fail
+    code = (
+        "import sys; sys.modules['seaborn'] = None; "
+        "import matplotlib; matplotlib.use('Agg'); "
+        "import numpy; import tmgen.plot as p; from tmgen import TrafficMatrix; "
+        "p.heatmap(TrafficMatrix(numpy.ones((2, 2, 12)))); print(p.seaborn)"
+    )
+    assert _run(code) == "None"
