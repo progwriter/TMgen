@@ -88,7 +88,7 @@ def test_default_uses_global_seed(name: str) -> None:
 @pytest.mark.parametrize("name", _RANDOM_MODELS)
 def test_rng_is_keyword_only(name: str) -> None:
     with pytest.raises(TypeError):
-        random_gravity_tm(3, 1.0, 7)  # type: ignore[call-arg]
+        random_gravity_tm(3, 1.0, 7)  # type: ignore[call-arg,arg-type]
 
 
 def test_spike_has_exactly_num_spikes_in_total() -> None:
@@ -207,3 +207,26 @@ def test_modulated_gravity_spatial_variance_changes_shares() -> None:
 def test_modulated_gravity_rejects_negative_variance() -> None:
     with pytest.raises(TMgenException):
         modulated_gravity_tm(3, 4, 10.0, spatial_variance=-1)
+
+
+def test_random_gravity_normalize_gives_exact_total() -> None:
+    tm = random_gravity_tm(7, 123.0, normalize=True, rng=4)
+    assert tm.matrix.shape == (7, 7, 1)
+    assert tm.matrix.sum() == pytest.approx(123.0)
+
+
+def test_random_gravity_default_total_is_random_around_expectation() -> None:
+    num_nodes, total = 5, 100.0
+    sums = numpy.array(
+        [random_gravity_tm(num_nodes, total, rng=s).matrix.sum() for s in range(4000)]
+    )
+    assert sums.std() > 1.0
+    assert sums.mean() == pytest.approx(total * (1 + 1 / num_nodes), rel=0.03)
+
+
+def test_random_gravity_weights_are_exponential() -> None:
+    tm = random_gravity_tm(2000, 1.0, rng=0).matrix[:, :, 0]
+    # the diagonal is T/N^2 * u^2, with u ~ Exp(1): E[u^2] = 2, E[u^4] = 24
+    u2 = numpy.diag(tm) * 2000**2
+    assert u2.mean() == pytest.approx(2.0, rel=0.1)
+    assert (u2**2).mean() == pytest.approx(24.0, rel=0.35)

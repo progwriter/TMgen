@@ -23,6 +23,12 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- `random_gravity_tm` draws its node weights from an exponential distribution
+  (eq. 6 of the paper) instead of normalized uniforms, so matrices are more
+  skewed. The total is now random, `mean_traffic * (1 + 1/num_nodes)` on
+  average because rows and columns share the weights; pass `normalize=True`
+  for an exact total of `mean_traffic`. The docs now say that `mean_traffic`
+  is the total, not the per-pair average.
 - `spike_tm` follows the paper: `num_spikes` is the total number of spikes
   over the whole `num_nodes x num_nodes x num_epochs` array, chosen uniformly,
   instead of that many per epoch. Multi-epoch results change.

@@ -177,24 +177,37 @@ def modulated_gravity_tm(
 
 
 def random_gravity_tm(
-    num_nodes: int, mean_traffic: float, *, rng: RngLike = None
+    num_nodes: int,
+    mean_traffic: float,
+    *,
+    normalize: bool = False,
+    rng: RngLike = None,
 ) -> TrafficMatrix:
     """
-    Random gravity model, parametrized by the mean traffic per ingress-egress
-    pair.
-    See http://dl.acm.org/citation.cfm?id=1096551 for full description
+    Random gravity model, the maximum entropy model for given total traffic
+    (eq. 6 of Tune and Roughan, SIGCOMM 2015; originally from
+    http://dl.acm.org/citation.cfm?id=1096551).
+
+    The matrix is :math:`X = (T / N^2)\\, u u^T` with the node weights
+    :math:`u_i` drawn independently from an exponential distribution with
+    mean 1, where :math:`T` is *mean_traffic* and :math:`N` is *num_nodes*.
+    The weights are shared by rows and columns, so the matrix is symmetric.
+    Its entries sum to :math:`T (1 + 1/N)` on average, and to a random value
+    in any one draw; use *normalize* for an exact total.
 
     :param num_nodes: number of nodes in the network
-    :param mean_traffic: average traffic volume between a pair of nodes
+    :param mean_traffic: the total traffic volume of the matrix, in
+        expectation (exactly with *normalize*). The average between a pair
+        of nodes is this divided by ``num_nodes ** 2``
+    :param normalize: scale the matrix so that its entries sum to exactly
+        *mean_traffic*
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: a new :py:class:`~TrafficMatrix`
     """
-    dist = _resolve_rng(rng).random((num_nodes, 1))
-    dist = dist / sum(dist)
-    matrix = numpy.matmul(dist, dist.T).clip(min=0) * mean_traffic
-    matrix = matrix.reshape((num_nodes, num_nodes, 1))
-
-    return TrafficMatrix(matrix)
+    weights = _resolve_rng(rng).exponential(1.0, size=num_nodes)
+    scale = weights.sum() ** 2 if normalize else num_nodes**2
+    matrix = numpy.outer(weights, weights) * (mean_traffic / scale)
+    return TrafficMatrix(matrix.reshape((num_nodes, num_nodes, 1)))
 
 
 def gravity_tm(populations: ArrayLike, total_traffic: float) -> TrafficMatrix:
