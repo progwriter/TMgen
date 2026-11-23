@@ -1,9 +1,9 @@
 from collections.abc import Iterator
 
-import matplotlib
 import numpy
 import pytest
 
+matplotlib = pytest.importorskip("matplotlib")  # an optional dependency
 matplotlib.use("Agg")
 
 from matplotlib import pyplot as plt  # noqa: E402
