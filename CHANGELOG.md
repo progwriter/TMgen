@@ -26,6 +26,9 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- `TrafficMatrix.num_nodes` and `num_epochs` are properties instead of methods,
+  and there is a new `shape` property. Calling them as before still works and
+  emits a `DeprecationWarning`.
 - `TrafficMatrix.to_pickle` and `from_pickle` are deprecated in favor of `save`
   and `load`, because unpickling can run arbitrary code. The D-ITG injector now
   reads `.npz` files written by `save` (convert old pickles with `from_pickle`

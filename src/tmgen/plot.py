@@ -59,15 +59,15 @@ def heatmap(tm: TrafficMatrix, epoch: int | None = None) -> None:
         tmgen.plot.heatmap(tm)
         plt.show()  # display the graph interactively
     """
-    n = tm.num_nodes()
+    n = tm.num_nodes
     reshaped = False
     if epoch is not None:
         matrix = tm.at_time(epoch)
     else:
-        if tm.num_epochs() == 1:
+        if tm.num_epochs == 1:
             matrix = tm.at_time(0)
         else:
-            matrix = tm.matrix.reshape((n * n, tm.num_epochs()))
+            matrix = tm.matrix.reshape((n * n, tm.num_epochs))
             reshaped = True
     if not reshaped:
         if seaborn is not None:
@@ -80,7 +80,7 @@ def heatmap(tm: TrafficMatrix, epoch: int | None = None) -> None:
     else:
         if seaborn is not None:
             seaborn.heatmap(
-                matrix, xticklabels=max(tm.num_epochs() / 10, 1), yticklabels=n
+                matrix, xticklabels=max(tm.num_epochs / 10, 1), yticklabels=n
             )
         else:
             _matplotlib_heatmap(matrix)
@@ -112,7 +112,7 @@ def timeseries(tm: TrafficMatrix) -> None:
         plt.show()  # display the graph interactively
 
     """
-    n = tm.num_nodes()
+    n = tm.num_nodes
     for i in range(n):
         for e in range(n):
             plt.plot(tm.between(i, e))

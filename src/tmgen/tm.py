@@ -41,6 +41,21 @@ def _aggregation(agg: str | None) -> str | None:
     raise TMgenException(f"agg must be None, 'min', 'max' or 'mean', got {agg!r}")
 
 
+class _Count(int):
+    """
+    An int that can still be called, so that ``tm.num_nodes()`` keeps working
+    (with a warning) after becoming a property.
+    """
+
+    def __call__(self) -> int:
+        warnings.warn(
+            "num_nodes and num_epochs are properties now: drop the parentheses",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return int(self)
+
+
 class TrafficMatrix:
     """
     Represents a traffic matrix: non-negative traffic volumes between
@@ -214,9 +229,9 @@ class TrafficMatrix:
         :param fname: the file name
         """
         epochs, ingress, egress = numpy.meshgrid(
-            numpy.arange(self.num_epochs()),
-            numpy.arange(self.num_nodes()),
-            numpy.arange(self.num_nodes()),
+            numpy.arange(self.num_epochs),
+            numpy.arange(self.num_nodes),
+            numpy.arange(self.num_nodes),
             indexing="ij",
         )
         rows = numpy.column_stack(
@@ -305,21 +320,25 @@ class TrafficMatrix:
         :return: a new TrafficMatrix
         """
         matrix = self.matrix.copy()
-        nodes = numpy.arange(self.num_nodes())
+        nodes = numpy.arange(self.num_nodes)
         matrix[nodes, nodes, :] = 0
         return TrafficMatrix._from_owned(matrix)
 
+    @property
     def num_nodes(self) -> int:
-        """
-        :return: The number of nodes in this traffic matrix
-        """
-        return int(self.matrix.shape[0])
+        """The number of nodes in this traffic matrix."""
+        return _Count(self.matrix.shape[0])
 
+    @property
     def num_epochs(self) -> int:
-        """
-        :return:  The number of epochs in this traffic matrix
-        """
-        return int(self.matrix.shape[2])
+        """The number of epochs in this traffic matrix."""
+        return _Count(self.matrix.shape[2])
+
+    @property
+    def shape(self) -> tuple[int, int, int]:
+        """The shape of the matrix: ``(num_nodes, num_nodes, num_epochs)``."""
+        nodes, _, epochs = self.matrix.shape
+        return nodes, nodes, epochs
 
     @staticmethod
     def from_pickle(fname: _Path) -> "TrafficMatrix":
@@ -345,7 +364,7 @@ class TrafficMatrix:
         return repr(self.matrix)
 
     def __len__(self) -> int:
-        return self.num_epochs()
+        return self.num_epochs
 
     def __add__(self, other: "TrafficMatrix") -> "TrafficMatrix":
         if not isinstance(other, TrafficMatrix):

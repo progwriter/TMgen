@@ -157,7 +157,7 @@ def test_save_uses_the_given_file_name(tmp_path: Path) -> None:
     path = tmp_path / "no_extension"
     TrafficMatrix(numpy.ones((2, 2, 1))).save(path)
     assert path.exists()
-    assert TrafficMatrix.load(path).num_nodes() == 2
+    assert TrafficMatrix.load(path).num_nodes == 2
 
 
 def test_load_rejects_pickled_data(tmp_path: Path) -> None:
@@ -203,3 +203,19 @@ def test_load_validates_the_data(tmp_path: Path) -> None:
 def test_load_missing_file(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         TrafficMatrix.load(tmp_path / "missing.npz")
+
+
+def test_size_properties() -> None:
+    tm = TrafficMatrix(numpy.ones((3, 3, 5)))
+    assert tm.num_nodes == 3
+    assert tm.num_epochs == 5
+    assert tm.shape == (3, 3, 5)
+    assert len(tm) == 5
+
+
+def test_calling_the_size_properties_still_works_but_warns() -> None:
+    tm = TrafficMatrix(numpy.ones((3, 3, 5)))
+    with pytest.warns(DeprecationWarning, match="drop the parentheses") as record:
+        assert tm.num_nodes() == 3  # type: ignore[operator]
+        assert tm.num_epochs() == 5  # type: ignore[operator]
+    assert all(r.filename == __file__ for r in record)

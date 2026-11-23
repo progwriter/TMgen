@@ -102,7 +102,7 @@ class DITGinjector(InjectorBase):
 
     def run(self) -> None:
         """Execute the injection"""
-        num_epochs = self.tm.num_epochs()
+        num_epochs = self.tm.num_epochs
         for e in range(num_epochs):
             # Each epoch new set of ITGSend will be started
             r = self._start_receiver()
