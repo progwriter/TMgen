@@ -6,9 +6,11 @@ import pytest
 import tmgen
 
 
-def test_public_names_exist() -> None:
-    for name in tmgen.__all__:
-        assert getattr(tmgen, name) is not None, name
+@pytest.mark.parametrize("name", tmgen.__all__)
+def test_public_name_exists(name: str) -> None:
+    if name == "plot":
+        pytest.importorskip("matplotlib")  # an optional dependency
+    assert getattr(tmgen, name) is not None
 
 
 def test_top_level_exports() -> None:
