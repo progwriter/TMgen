@@ -120,3 +120,13 @@ def test_single_sample_returns_the_initial_point() -> None:
         numpy.eye(2), numpy.zeros(2), numpy.eye(2), numpy.zeros(2), numpy.ones(2), 1
     )
     numpy.testing.assert_array_equal(xs, [[1.0], [1.0]])
+
+
+def test_degenerate_constraints_raise_instead_of_looping(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # a zero row of f with g = 0 can never satisfy the strict inequality
+    monkeypatch.setattr(hmc, "MAX_CONSECUTIVE_REJECTIONS", 20)
+    f = numpy.array([[1.0, 0.0], [0.0, 0.0]])
+    with pytest.raises(TMgenException, match="consecutive rejections"):
+        hmc_sample(f, numpy.zeros(2), numpy.eye(2), numpy.zeros(2), numpy.ones(2), 5)

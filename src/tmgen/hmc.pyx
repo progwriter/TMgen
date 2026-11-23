@@ -13,6 +13,11 @@ from tmgen.exceptions import TMgenException
 # falls back to recomputing F @ a and F @ b after every reflection.
 MAX_GRAM_BYTES = 268435456
 
+# A candidate is rejected when rounding error leaves it outside the
+# constraints. This many rejections in a row means the problem is degenerate
+# (for example a constraint that can never be strictly satisfied).
+MAX_CONSECUTIVE_REJECTIONS = 1000
+
 cdef double NEAR_ZERO = 10000 * 2.220446049250313e-16
 
 
@@ -28,7 +33,8 @@ cdef void _matvec(double[:, ::1] f, double[::1] x, double[::1] out) noexcept nog
 
 cdef numpy.ndarray _sample_loop(double[:, ::1] f, double[::1] g,
                                 double[::1] x0, int num_samples, object rng,
-                                Py_ssize_t max_gram_bytes):
+                                Py_ssize_t max_gram_bytes,
+                                Py_ssize_t max_rejections):
     """
     Exact HMC on the whitened problem: sample x ~ N(0, I) with f x + g >= 0.
 
@@ -38,7 +44,7 @@ cdef numpy.ndarray _sample_loop(double[:, ::1] f, double[::1] g,
     in O(m) from the Gram matrix instead of recomputed in O(m d).
     """
     cdef Py_ssize_t m = f.shape[0], d = f.shape[1]
-    cdef Py_ssize_t i = 1, k, j, jbest
+    cdef Py_ssize_t i = 1, k, j, jbest, rejections = 0
     cdef bint use_gram = m * m * 8 <= max_gram_bytes
     cdef double[:, ::1] gram
     cdef double[::1] f2 = numpy.empty(m)
@@ -137,6 +143,14 @@ cdef numpy.ndarray _sample_loop(double[:, ::1] f, double[::1] g,
                 out[k, i] = x[k]
                 last[k] = x[k]
             i += 1
+            rejections = 0
+        else:
+            rejections += 1
+            if rejections >= max_rejections:
+                raise TMgenException(
+                    f'No valid sample after {max_rejections} consecutive '
+                    'rejections; the constraints may be degenerate '
+                    '(for example an all-zero row of f with g = 0)')
     return result
 
 
@@ -222,7 +236,8 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
     result_xs = _sample_loop(numpy.ascontiguousarray(f),
                              numpy.ascontiguousarray(g),
                              numpy.ascontiguousarray(initial_x),
-                             num_samples, sampler, MAX_GRAM_BYTES)
+                             num_samples, sampler, MAX_GRAM_BYTES,
+                             MAX_CONSECUTIVE_REJECTIONS)
 
     # transform back to the unwhitened frame
     if covariance:

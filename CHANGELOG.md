@@ -61,6 +61,9 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Fixed
 
+- `hmc_sample` looped forever on degenerate constraints that every candidate
+  sample violates; it now raises `TMgenException` after 1000 consecutive
+  rejections.
 - `modulated_gravity_tm` ignored `spatial_variance` and `temporal_variance`. They
   now set the variance of the truncated-normal node shares and of the total
   traffic around its cycle, as in the paper. Both default to 0 (the previous
