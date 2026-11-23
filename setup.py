@@ -8,7 +8,7 @@ extensions = [
         [f"src/tmgen/{name}.pyx"],
         include_dirs=[numpy.get_include()],
     )
-    for name in ("hmc", "models", "tm")
+    for name in ("hmc",)
 ]
 
 setup(

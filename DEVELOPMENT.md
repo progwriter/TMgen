@@ -11,9 +11,9 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-The editable install builds the Cython extensions in place. After editing a
-`.pyx` file, rebuild them by running `pip install -e .` again; Python-only
-changes need nothing.
+The editable install builds the `hmc` Cython extension in place. After editing
+`hmc.pyx`, rebuild it by running `pip install -e .` again; Python changes need
+nothing.
 
 The package version comes from git tags (setuptools-scm), so an untagged
 checkout reports a `0.1.devN` version.
@@ -35,11 +35,10 @@ built. CI runs the same hooks.
 
 ## Layout
 
-- `src/tmgen/models.pyx`, `tm.pyx`, `hmc.pyx`: the compiled modules.
-- `src/tmgen/*.pyi`, `*.pxd`: type stubs for the public API and the Cython
-  interface. Ruff and mypy cannot see `.pyx` files, so when you change a
-  signature there, update the matching `.pyi` (and `.pxd`) by hand.
-- `src/tmgen/plot.py`, `src/tmgen/inject/`: plain Python.
+- `src/tmgen/tm.py`, `models.py`, `plot.py`, `inject/`: plain Python (NumPy).
+- `src/tmgen/hmc.pyx`: the only compiled module. Ruff and mypy cannot see
+  `.pyx` files, so when you change its signature, update `hmc.pyi` (and
+  `hmc.pxd`) by hand.
 - `tests/`, `docs/`, `tools/` (release helpers).
 
 ## Checks

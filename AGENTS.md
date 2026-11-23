@@ -1,11 +1,11 @@
 # TMgen agent guide
 
-TMgen generates network traffic matrices. Python 3.11+, with Cython extensions.
+TMgen generates network traffic matrices. Python 3.11+, with one Cython extension (`hmc`).
 
 ## Layout
 
-- `src/tmgen/models.pyx`, `tm.pyx`, `hmc.pyx`: compiled modules. Hand-written stubs (`*.pyi`) next to them define the typed public API; `*.pxd` declare the Cython interface.
-- `src/tmgen/plot.py`, `inject/`: pure Python.
+- `src/tmgen/tm.py`, `models.py`, `plot.py`, `inject/`: pure Python (NumPy).
+- `src/tmgen/hmc.pyx`: the only compiled module; `hmc.pyi` (typed API) and `hmc.pxd` are hand-written.
 - `tests/`, `docs/` (Sphinx; `docs/quickstart.rst` doctests run under pytest), `tools/` (release helpers, type-checked and tested).
 - `agentdocs/` (git-ignored): local notes such as `PLAN.md` and `API_CRITIQUE.md`. Never commit them. Keep `agentdocs/PLAN.md` current as work lands.
 
@@ -15,7 +15,7 @@ TMgen generates network traffic matrices. Python 3.11+, with Cython extensions.
 
 ```
 uv venv && uv pip install -e '.[dev]'
-uv pip install -e .   # rebuild after editing .pyx
+uv pip install -e .   # rebuild after editing hmc.pyx
 ```
 
 CI runs these (plus the pre-commit hooks in `.pre-commit-config.yaml`, which add whitespace checks and a strict Sphinx build, `python -m sphinx -W -b html docs docs/_build`), and every commit should pass them:
@@ -30,7 +30,7 @@ pytest            # tests + docs doctests, each in a temp dir (conftest.py)
 Gotchas:
 
 - Ruff's import sorting depends on whether the extension is built, so run `ruff check` after building.
-- Ruff and mypy do not see `.pyx` files. When a `.pyx` signature changes, update its `.pyi` stub (and `.pxd`) by hand.
+- Ruff and mypy do not see `.pyx` files. When `hmc.pyx`'s signature changes, update `hmc.pyi` (and `hmc.pxd`) by hand.
 
 ## Code style
 

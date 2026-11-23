@@ -14,12 +14,16 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 - `tmgen.hmc.hmc_sample`, a Python-visible wrapper around the truncated
   Gaussian HMC sampler.
-- Type stubs and a `py.typed` marker for the compiled modules.
+- Type stubs and a `py.typed` marker.
 - `tmgen.__version__`.
 - `lognormal_tm` is exported from `tmgen.models`.
 
 ### Changed
 
+- `TrafficMatrix` and the traffic models are now pure Python/NumPy instead
+  of Cython, with identical results for a given NumPy seed. Only the HMC
+  sampler is still compiled. `TrafficMatrix` now raises `TypeError` for
+  non-array input.
 - Requires Python 3.11 or newer.
 - Package metadata and build requirements moved to `pyproject.toml`; the
   version is derived from git tags.
