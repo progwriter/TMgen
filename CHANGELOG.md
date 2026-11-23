@@ -12,6 +12,9 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Added
 
+- `TrafficMatrix.modulate(profile)` scales a single-epoch matrix by one
+  multiplier per epoch, so any spatial model can be combined with any temporal
+  pattern.
 - `TrafficMatrix` interoperates with NumPy and Python: `numpy.asarray(tm)`,
   indexing (`tm[ingress, egress, epoch]`), iteration over the epochs, `==`, and
   multiplication or division by a non-negative number.

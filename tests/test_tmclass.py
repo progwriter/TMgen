@@ -290,3 +290,33 @@ def test_scaling_by_non_numbers_is_a_type_error() -> None:
         _tm() * True
     with pytest.raises(TypeError):
         _tm() * _tm()  # type: ignore[operator]
+
+
+def test_modulate_scales_the_matrix_per_epoch() -> None:
+    base = TrafficMatrix(numpy.array([[1.0, 2.0], [3.0, 4.0]])[:, :, None])
+    result = base.modulate([0.0, 1.0, 2.5])
+    assert result.shape == (2, 2, 3)
+    numpy.testing.assert_array_equal(result.at_time(0), numpy.zeros((2, 2)))
+    numpy.testing.assert_array_equal(result.at_time(1), base.at_time(0))
+    numpy.testing.assert_array_equal(result.at_time(2), 2.5 * base.at_time(0))
+    assert not result.matrix.flags.writeable
+
+
+def test_modulate_composes_with_models() -> None:
+    totals = numpy.array([2.0, 6.0, 4.0])
+    spatial = models.gravity_tm([1, 2, 3], totals.mean())
+    result = spatial.modulate(totals / totals.mean())
+    numpy.testing.assert_allclose(result.matrix.sum(axis=(0, 1)), totals)
+
+
+def test_modulate_rejects_multi_epoch_matrices() -> None:
+    with pytest.raises(TMgenException, match="single-epoch"):
+        TrafficMatrix(numpy.ones((2, 2, 2))).modulate([1.0])
+
+
+@pytest.mark.parametrize(
+    "profile", [[], [[1.0]], [-1.0], [float("nan")], [float("inf")], ["a"], 1.0]
+)
+def test_modulate_rejects_invalid_profiles(profile: object) -> None:
+    with pytest.raises(TMgenException):
+        TrafficMatrix(numpy.ones((2, 2, 1))).modulate(profile)  # type: ignore[arg-type]

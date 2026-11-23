@@ -318,6 +318,33 @@ class TrafficMatrix:
         """
         return TrafficMatrix._from_owned(self.matrix.max(axis=2, keepdims=True))
 
+    def modulate(self, profile: ArrayLike) -> "TrafficMatrix":
+        """
+        Turn a single-epoch matrix into a time series by scaling it with a
+        profile: epoch ``t`` of the result is this matrix times ``profile[t]``.
+        Combine any spatial model with any temporal pattern, such as a daily
+        cycle or a measured total traffic series divided by its mean.
+
+        :param profile: one finite, non-negative multiplier per epoch
+        :return: a new TrafficMatrix with ``len(profile)`` epochs
+        :raises TMgenException: if this matrix has more than one epoch, or the
+            profile is not a non-empty 1-d array of finite non-negative numbers
+        """
+        if self.num_epochs != 1:
+            raise TMgenException(
+                f"Only a single-epoch matrix can be modulated, got {self.num_epochs} "
+                "epochs"
+            )
+        try:
+            values = numpy.asarray(profile, dtype=numpy.float64)
+        except (TypeError, ValueError):
+            raise TMgenException("profile must be an array of numbers") from None
+        if values.ndim != 1 or values.size == 0:
+            raise TMgenException("profile must be a non-empty 1-d array")
+        if not numpy.isfinite(values).all() or (values < 0).any():
+            raise TMgenException("profile values must be finite and non-negative")
+        return TrafficMatrix._from_owned(self.matrix * values)
+
     def zero_diagonal(self) -> "TrafficMatrix":
         """
         Return a new traffic matrix with the diagonal (traffic from a node to
