@@ -219,3 +219,74 @@ def test_calling_the_size_properties_still_works_but_warns() -> None:
         assert tm.num_nodes() == 3  # type: ignore[operator]
         assert tm.num_epochs() == 5  # type: ignore[operator]
     assert all(r.filename == __file__ for r in record)
+
+
+def _tm() -> TrafficMatrix:
+    return TrafficMatrix(numpy.arange(8.0).reshape((2, 2, 2)))
+
+
+def test_numpy_functions_accept_a_traffic_matrix() -> None:
+    tm = _tm()
+    assert numpy.asarray(tm) is tm.matrix
+    assert numpy.sum(tm) == 28.0
+    assert numpy.asarray(tm, dtype=numpy.float32).dtype == numpy.float32
+    copy = numpy.array(tm)
+    copy[0, 0, 0] = 99  # a copy is writable
+    assert tm.matrix[0, 0, 0] == 0.0
+    with pytest.raises(ValueError, match="copy"):
+        numpy.asarray(tm, dtype=numpy.float32, copy=False)
+
+
+def test_indexing_follows_the_array() -> None:
+    tm = _tm()
+    assert tm[0, 1, 1] == 3.0
+    numpy.testing.assert_array_equal(tm[0, 1], [2.0, 3.0])
+    numpy.testing.assert_array_equal(tm[:, :, 1], tm.at_time(1))
+    assert not tm[0].flags.writeable
+
+
+def test_iteration_yields_the_epochs() -> None:
+    tm = _tm()
+    epochs = list(tm)
+    assert len(epochs) == len(tm) == 2
+    numpy.testing.assert_array_equal(epochs[1], tm.at_time(1))
+
+
+def test_equality() -> None:
+    assert _tm() == _tm()
+    assert _tm() != TrafficMatrix(numpy.ones((2, 2, 2)))
+    assert _tm() != TrafficMatrix(numpy.ones((3, 3, 1)))
+    assert _tm() != "not a matrix"
+    with pytest.raises(TypeError):
+        hash(_tm())
+
+
+def test_scaling() -> None:
+    tm = _tm()
+    assert (2 * tm).matrix.sum() == 56.0
+    assert (tm * 0.5) == TrafficMatrix(tm.matrix / 2)
+    assert (tm / 4).matrix.max() == 7 / 4
+    assert (tm * numpy.float64(2)) == 2 * tm
+    assert not (tm * 2).matrix.flags.writeable
+
+
+@pytest.mark.parametrize("factor", [-1, float("nan"), float("inf")])
+def test_scaling_rejects_invalid_factors(factor: float) -> None:
+    with pytest.raises(TMgenException):
+        _tm() * factor
+    with pytest.raises(TMgenException):
+        _tm() / factor
+
+
+def test_division_by_zero_raises() -> None:
+    with pytest.raises(TMgenException, match="positive"):
+        _tm() / 0
+
+
+def test_scaling_by_non_numbers_is_a_type_error() -> None:
+    with pytest.raises(TypeError):
+        _tm() * "a"  # type: ignore[operator]
+    with pytest.raises(TypeError):
+        _tm() * True
+    with pytest.raises(TypeError):
+        _tm() * _tm()  # type: ignore[operator]

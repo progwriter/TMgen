@@ -12,6 +12,9 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Added
 
+- `TrafficMatrix` interoperates with NumPy and Python: `numpy.asarray(tm)`,
+  indexing (`tm[ingress, egress, epoch]`), iteration over the epochs, `==`, and
+  multiplication or division by a non-negative number.
 - `TrafficMatrix.save` and `TrafficMatrix.load`: a compressed `.npz` format with
   a version number. Loading never unpickles, so it is safe for untrusted files.
 - `TrafficMatrix.zero_diagonal()`, which returns a copy without self-traffic.

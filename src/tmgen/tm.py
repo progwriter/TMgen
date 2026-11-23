@@ -2,10 +2,11 @@ import os
 import pickle
 import warnings
 import zipfile
-from typing import Literal, overload
+from collections.abc import Iterator
+from typing import Any, Literal, overload
 
 import numpy
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import ArrayLike, DTypeLike, NDArray
 
 from tmgen._compat import renamed_arguments
 from tmgen.exceptions import TMgenException
@@ -39,6 +40,12 @@ def _aggregation(agg: str | None) -> str | None:
         )
         return _LEGACY_AGGREGATIONS[agg.lower()]
     raise TMgenException(f"agg must be None, 'min', 'max' or 'mean', got {agg!r}")
+
+
+def _is_number(value: object) -> bool:
+    return isinstance(value, int | float | numpy.integer | numpy.floating) and not (
+        isinstance(value, bool)
+    )
 
 
 class _Count(int):
@@ -375,3 +382,57 @@ class TrafficMatrix:
                 f"and {other.matrix.shape}"
             )
         return TrafficMatrix._from_owned(self.matrix + other.matrix)
+
+    def _scaled(self, factor: float, divide: bool) -> "TrafficMatrix":
+        value = float(factor)
+        if not numpy.isfinite(value) or value < 0 or (divide and value == 0):
+            raise TMgenException(
+                "Traffic matrices can only be scaled by finite non-negative "
+                f"numbers (and divided by positive ones), got {factor!r}"
+            )
+        scaled = self.matrix / value if divide else self.matrix * value
+        return TrafficMatrix._from_owned(scaled)
+
+    def __mul__(self, factor: float) -> "TrafficMatrix":
+        if not _is_number(factor):
+            return NotImplemented
+        return self._scaled(factor, divide=False)
+
+    __rmul__ = __mul__
+
+    def __truediv__(self, divisor: float) -> "TrafficMatrix":
+        if not _is_number(divisor):
+            return NotImplemented
+        return self._scaled(divisor, divide=True)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, TrafficMatrix):
+            return NotImplemented
+        return bool(numpy.array_equal(self.matrix, other.matrix))
+
+    __hash__ = None  # type: ignore[assignment]
+
+    def __iter__(self) -> Iterator[NDArray[numpy.float64]]:
+        """Iterate over the epochs, as :py:meth:`at_time` returns them."""
+        for epoch in range(self.num_epochs):
+            yield self.at_time(epoch)
+
+    def __getitem__(self, key: Any) -> Any:
+        """
+        Index like the underlying array, ``tm[ingress, egress, epoch]``. The
+        result is read-only.
+        """
+        return self.matrix[key]
+
+    def __array__(
+        self, dtype: DTypeLike | None = None, copy: bool | None = None
+    ) -> NDArray[Any]:
+        """
+        Let NumPy functions accept a traffic matrix. The result is the
+        read-only data, unless a copy or another dtype is requested.
+        """
+        if dtype is not None and numpy.dtype(dtype) != self.matrix.dtype:
+            if copy is False:
+                raise ValueError("Converting to another dtype requires a copy")
+            return self.matrix.astype(dtype)
+        return self.matrix.copy() if copy else self.matrix
