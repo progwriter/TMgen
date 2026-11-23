@@ -1,10 +1,14 @@
+import math
 from collections.abc import Callable
+from typing import Any
 
 import numpy
 import pytest
 
+from tmgen.exceptions import TMgenException
 from tmgen.models import (
     _peak_mean_cycle,
+    _truncated_normal,
     exp_tm,
     gravity_tm,
     lognormal_tm,
@@ -108,8 +112,72 @@ def test_modulated_gravity_scales_base_by_sinusoid() -> None:
 
 @pytest.mark.parametrize("num_nodes", [2, 10])
 def test_modulated_gravity_epoch_totals_follow_sinusoid(num_nodes: int) -> None:
-    tm = modulated_gravity_tm(num_nodes, 48, 100.0, pm_ratio=2, t_ratio=1, rng=0)
+    tm = modulated_gravity_tm(
+        num_nodes,
+        48,
+        100.0,
+        pm_ratio=2,
+        t_ratio=1,
+        rng=0,
+    )
     totals = tm.matrix.sum(axis=(0, 1))
     expected = _peak_mean_cycle(1 / 24, 48, 100.0, 2, 1)
     numpy.testing.assert_allclose(totals, expected, atol=1e-9)
     assert totals.mean() == pytest.approx(100.0, rel=0.05)
+
+
+def _truncated_mean_std(mu: float, sigma: float) -> tuple[float, float]:
+    alpha = -mu / sigma
+    pdf = math.exp(-(alpha**2) / 2) / math.sqrt(2 * math.pi)
+    tail = 0.5 * math.erfc(alpha / math.sqrt(2))
+    lam = pdf / tail
+    mean = mu + sigma * lam
+    var = sigma**2 * (1 + alpha * lam - lam**2)
+    return mean, math.sqrt(var)
+
+
+@pytest.mark.parametrize("mu", [-3.0, -0.5, 0.0, 0.5, 2.0])
+def test_truncated_normal_moments(mu: float) -> None:
+    gen = numpy.random.default_rng(0)
+    x = _truncated_normal(gen, numpy.full(200_000, mu), 1.0)
+    mean, std = _truncated_mean_std(mu, 1.0)
+    assert (x >= 0).all()
+    assert x.mean() == pytest.approx(mean, rel=0.02)
+    assert x.std() == pytest.approx(std, rel=0.03)
+
+
+def test_truncated_normal_zero_std_returns_clipped_mean() -> None:
+    gen = numpy.random.default_rng(0)
+    out = _truncated_normal(gen, numpy.array([-1.0, 0.0, 2.5]), 0.0)
+    numpy.testing.assert_array_equal(out, [0.0, 0.0, 2.5])
+
+
+def test_modulated_gravity_temporal_variance_adds_noise() -> None:
+    kwargs: dict[str, Any] = dict(
+        num_nodes=4, num_tms=2000, mean_traffic=1000.0, pm_ratio=1.5, t_ratio=1.0
+    )
+    quiet = modulated_gravity_tm(
+        spatial_variance=0, temporal_variance=0, rng=0, **kwargs
+    )
+    noisy = modulated_gravity_tm(
+        spatial_variance=0, temporal_variance=100, rng=0, **kwargs
+    )
+    deviation = noisy.matrix.sum(axis=(0, 1)) - quiet.matrix.sum(axis=(0, 1))
+    # the standard deviation of the total is sqrt(temporal_variance)
+    assert deviation.std() == pytest.approx(10.0, rel=0.1)
+    assert deviation.mean() == pytest.approx(0.0, abs=1.0)
+
+
+def test_modulated_gravity_spatial_variance_changes_shares() -> None:
+    kwargs: dict[str, Any] = dict(
+        num_nodes=5, num_tms=4, mean_traffic=1000.0, temporal_variance=0
+    )
+    exact = modulated_gravity_tm(spatial_variance=0, rng=3, **kwargs)
+    noisy = modulated_gravity_tm(spatial_variance=2500, rng=3, **kwargs)
+    assert not numpy.allclose(exact.matrix, noisy.matrix)
+    assert (noisy.matrix >= 0).all()
+
+
+def test_modulated_gravity_rejects_negative_variance() -> None:
+    with pytest.raises(TMgenException):
+        modulated_gravity_tm(3, 4, 10.0, spatial_variance=-1)

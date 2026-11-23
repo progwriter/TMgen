@@ -20,6 +20,47 @@ def _resolve_rng(
     return numpy.random.default_rng(rng)
 
 
+def _truncated_normal(
+    gen: numpy.random.Generator | numpy.random.RandomState,
+    mean: NDArray[numpy.float64],
+    std: float,
+) -> NDArray[numpy.float64]:
+    """
+    Sample independent normals with the given means and standard deviation,
+    truncated to [0, inf). Note that *mean* and *std* are those of the
+    untruncated normal.
+
+    Uses rejection sampling: from the normal itself when most of its mass is
+    positive, otherwise Robert's exponential proposal for the tail.
+    """
+    mean = numpy.asarray(mean, dtype=numpy.float64)
+    if std == 0:
+        return numpy.clip(mean, 0, None)
+    lower = -mean / std  # truncation point of the standardized variable
+    out = numpy.empty(mean.shape)
+    todo = numpy.ones(mean.shape, dtype=bool)
+    while todo.any():
+        a = lower[todo]
+        count = a.size
+        z = numpy.empty(count)
+        accept = numpy.empty(count, dtype=bool)
+        body = a <= 0
+        if body.any():
+            z[body] = gen.standard_normal(int(body.sum()))
+            accept[body] = z[body] >= a[body]
+        tail = ~body
+        if tail.any():
+            at = a[tail]
+            rate = (at + numpy.sqrt(at * at + 4)) / 2
+            zt = at + gen.exponential(1.0, size=at.size) / rate
+            z[tail] = zt
+            accept[tail] = gen.random(at.size) <= numpy.exp(-((zt - rate) ** 2) / 2)
+        idx = numpy.flatnonzero(todo)
+        out[idx[accept]] = z[accept]
+        todo[idx[accept]] = False
+    return numpy.clip(mean + std * out, 0, None)
+
+
 def _peak_mean_cycle(
     freq: float,
     n: int,
@@ -79,13 +120,21 @@ def modulated_gravity_tm(
     pm_ratio: float = 1.5,
     t_ratio: float = 0.75,
     diurnal_freq: float = 1 / 24,
-    spatial_variance: float = 100,
-    temporal_variance: float = 0.01,
+    spatial_variance: float = 0,
+    temporal_variance: float = 0,
     *,
     rng: RngLike = None,
 ) -> TrafficMatrix:
     """
-    Generate a modulated gravity traffic matrix with the given parameters
+    Generate a modulated gravity traffic matrix (Tune and Roughan, SIGCOMM 2015).
+
+    The total traffic follows a sinusoidal cycle with mean *mean_traffic*.
+    Each epoch is :math:`X(t) = T\\, u\\, u^T p(t)`, where :math:`T` is the mean
+    total, :math:`u` holds each node's share of the traffic and :math:`p(t)`
+    the relative volume at time :math:`t`. Both are drawn from normal
+    distributions truncated at zero, centered on a random split of the
+    traffic and on the cycle. With non-zero variances the total of an epoch
+    matches the cycle only in expectation.
 
     :param num_nodes: number of Points-of-Presence (i.e., origin-destination pairs)
     :param num_tms: total number of traffic matrices to generate (i.e., time epochs)
@@ -95,22 +144,36 @@ def modulated_gravity_tm(
     :param t_ratio: trough-to-mean ratio. Default is 0.75
     :param diurnal_freq: Frequency of modulation. Default is 1/24 (i.e., hourly)
         if you are generating multi-day TMs
-    :param spatial_variance: Variance on the volume of traffic between
-        origin-destination pairs.
-        Pick something reasonable with respect to your mean_traffic.
-        Default is 100
-    :param temporal_variance: Variance on the volume in time
+    :param spatial_variance: Variance of each node's traffic, in squared
+        traffic units. Each share of the mean traffic then has a standard
+        deviation of ``sqrt(spatial_variance) / mean_traffic``. The default,
+        0, gives deterministic shares. The effect depends on the scale of
+        *mean_traffic* and *num_nodes*: large values relative to
+        ``mean_traffic / num_nodes`` inflate the total
+    :param temporal_variance: Variance of the total traffic around the cycle,
+        in squared traffic units. The default, 0, follows the cycle exactly
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
-    :return:
+    :return: a new :py:class:`~TrafficMatrix`
     """
+    if spatial_variance < 0 or temporal_variance < 0:
+        raise TMgenException("Variances must be non-negative")
+    gen = _resolve_rng(rng)
 
     total = _peak_mean_cycle(diurnal_freq, num_tms, mean_traffic, pm_ratio, t_ratio)
     if numpy.min(total) < 0:
         total = total + numpy.absolute(numpy.min(total))
+    mean_total = float(numpy.mean(total))
+    if mean_total <= 0:
+        raise TMgenException("The mean traffic must be positive")
 
-    # the base matrix sums to 1, so each epoch's total is the modulated total
-    base = random_gravity_tm(num_nodes, 1.0, rng=rng)
-    return TrafficMatrix(base.matrix * total)
+    shares = gen.random(num_nodes)
+    shares /= shares.sum()
+    node = _truncated_normal(gen, shares, numpy.sqrt(spatial_variance) / mean_total)
+    modulation = _truncated_normal(
+        gen, total / mean_total, numpy.sqrt(temporal_variance) / mean_total
+    )
+    gravity = mean_total * numpy.outer(node, node)
+    return TrafficMatrix(gravity[:, :, None] * modulation)
 
 
 def random_gravity_tm(

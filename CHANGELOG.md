@@ -43,6 +43,10 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Fixed
 
+- `modulated_gravity_tm` ignored `spatial_variance` and `temporal_variance`. They
+  now set the variance of the truncated-normal node shares and of the total
+  traffic around its cycle, as in the paper. Both default to 0 (the previous
+  effective behavior), and negative values raise `TMgenException`.
 - `modulated_gravity_tm` scaled the traffic by an extra `mean_traffic /
   num_nodes`, so the total of each epoch did not follow the requested
   total-traffic cycle.
