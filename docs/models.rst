@@ -211,13 +211,42 @@ spatial matrix:
 >>> numpy.allclose(series.matrix.sum(axis=(0, 1)), measured_totals)
 True
 
+Independent epochs and time zones: NCIM
+---------------------------------------
+
+:py:func:`~tmgen.models.ncim_tm` is the paper's non-stationary conditionally
+independent model: every epoch is drawn on its own, so there is no correlation
+between epochs, yet its traffic follows what you know about each one. With only
+the mean total of each epoch, every entry is exponential with mean
+``total / num_nodes**2``:
+
+>>> from tmgen.models import ncim_tm
+>>> totals = diurnal_profile(num_epochs=24, mean=100.0)
+>>> tm = ncim_tm(totals, num_nodes=4, rng=1)
+>>> tm.shape
+(4, 4, 24)
+
+If you also know how much traffic enters and leaves each node, pass
+``ingress_traffic`` and ``egress_traffic`` (shape ``(num_nodes, num_epochs)``,
+or ``(num_nodes,)`` for a constant). Each epoch is then a random gravity model
+whose mean is ``ingress[i] * egress[j] / total``. Giving each node a delayed
+copy of a daily cycle, with :py:func:`~tmgen.models.time_zone_profiles`, models
+a network that spans time zones: here the second node is 12 hours behind.
+
+>>> from tmgen.models import time_zone_profiles
+>>> cycle = diurnal_profile(num_epochs=24, mean=50.0)
+>>> traffic = time_zone_profiles(cycle, shifts=[0, 12])
+>>> world = ncim_tm(
+...     totals, ingress_traffic=traffic, egress_traffic=traffic, rng=1
+... )
+>>> world.shape
+(2, 2, 24)
+
 Not available yet
 -----------------
 
-The paper also describes models that TMgen does not expose yet: the
-non-stationary conditionally independent model (NCIM), shifted time zones, a
-Fourier-constrained temporal model, traffic classes, and the general maximum
-entropy model with arbitrary constraints. The sampler they rely on is
+The paper also describes models that TMgen does not expose yet: traffic
+classes and the general maximum entropy model with arbitrary constraints. The sampler they rely on is
 available as :py:func:`~tmgen.hmc.hmc_sample`, see :doc:`sampling`.
 
 References

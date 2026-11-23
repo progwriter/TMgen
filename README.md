@@ -36,6 +36,7 @@ tm.zero_diagonal().save("day.npz")
 | Gravity | `gravity_tm` | Traffic proportional to the product of node sizes, no randomness |
 | Random gravity | `random_gravity_tm` | Gravity with random node weights (the maximum entropy model for a given total) |
 | Modulated gravity | `modulated_gravity_tm` | Random gravity scaled over time by a daily cycle, with optional noise |
+| Non-stationary conditionally independent | `ncim_tm` | Each epoch drawn independently around known totals, optionally per node and time zone |
 | Spike | `spike_tm` | A few large, randomly placed flows |
 | Uniform, exponential, lognormal | `uniform_tm`, `exp_tm`, `lognormal_tm` | Independent random entries |
 | Exact | `exact_tm` | Every entry the same, for tests |
@@ -43,9 +44,9 @@ tm.zero_diagonal().save("day.npz")
 Any spatial model can be combined with any temporal pattern using
 `TrafficMatrix.modulate` and `diurnal_profile`. The sampler behind the paper's
 models, an exact Hamiltonian Monte Carlo for truncated Gaussians, is available
-as `tmgen.hmc.hmc_sample`. The paper's non-stationary conditionally
-independent model and the general maximum entropy model with constraints are
-not exposed yet.
+as `tmgen.hmc.hmc_sample`. The paper's traffic
+classes and the general maximum entropy model with constraints are not
+exposed yet.
 
 ## Installation
 

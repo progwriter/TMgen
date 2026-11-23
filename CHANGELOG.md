@@ -13,6 +13,8 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 ### Added
 
 - `fourier_profile`: a cyclical profile built from Fourier components (eq. 8 of the paper).
+- `ncim_tm`: the paper's non-stationary conditionally independent model (eqs. 14 and 15), with optional per-node ingress and egress traffic and truncated-normal variance control.
+- `time_zone_profiles`: delayed copies of a cycle, one per node, to model nodes in different time zones.
 - `modulated_gravity_tm(profile=...)` takes the mean total traffic of every epoch, for example from `fourier_profile`, instead of the daily cycle.
 
 ## [0.2.0] - 2026-11-23

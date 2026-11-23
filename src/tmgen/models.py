@@ -65,19 +65,24 @@ def _resolve_rng(rng: RngLike) -> Any:
 def _truncated_normal(
     gen: Any,
     mean: NDArray[numpy.float64],
-    std: float,
+    std: float | NDArray[numpy.float64],
 ) -> NDArray[numpy.float64]:
     """
     Sample independent normals with the given means and standard deviation,
     truncated to [0, inf). Note that *mean* and *std* are those of the
-    untruncated normal.
+    untruncated normal. *std* is a number, or an array of positive numbers
+    that broadcasts against *mean*.
 
     Uses rejection sampling: from the normal itself when most of its mass is
     positive, otherwise Robert's exponential proposal for the tail.
     """
     mean = numpy.asarray(mean, dtype=numpy.float64)
-    if std == 0:
+    std = numpy.asarray(std, dtype=numpy.float64)
+    if not std.any():
         return numpy.clip(mean, 0, None)
+    shape = mean.shape
+    std = numpy.broadcast_to(std, shape).ravel()
+    mean = mean.ravel()
     lower = -mean / std  # truncation point of the standardized variable
     out = numpy.empty(mean.shape)
     todo = numpy.ones(mean.shape, dtype=bool)
@@ -100,7 +105,34 @@ def _truncated_normal(
         idx = numpy.flatnonzero(todo)
         out[idx[accept]] = z[accept]
         todo[idx[accept]] = False
-    return numpy.clip(mean + std * out, 0, None)
+    return numpy.clip(mean + std * out, 0, None).reshape(shape)
+
+
+def _series(values: ArrayLike, name: str) -> NDArray[numpy.float64]:
+    """A non-empty one-dimensional array of finite non-negative numbers."""
+    array = numpy.asarray(values, dtype=numpy.float64)
+    if array.ndim != 1 or array.size == 0:
+        raise TMgenException(f"{name} must be a non-empty one-dimensional array")
+    if not numpy.isfinite(array).all() or (array < 0).any():
+        raise TMgenException(f"{name} must be finite and non-negative")
+    return array
+
+
+def _node_traffic(
+    values: ArrayLike, num_epochs: int, name: str
+) -> NDArray[numpy.float64]:
+    """Per-node traffic as (num_nodes, num_epochs); a 1-D input is constant in time."""
+    array = numpy.asarray(values, dtype=numpy.float64)
+    if array.ndim == 1:
+        array = numpy.repeat(array[:, None], num_epochs, axis=1)
+    if array.ndim != 2 or array.shape[0] == 0 or array.shape[1] != num_epochs:
+        raise TMgenException(
+            f"{name} must have shape (num_nodes, {num_epochs}) or (num_nodes,), "
+            f"got {numpy.shape(values)}"
+        )
+    if not numpy.isfinite(array).all() or (array < 0).any():
+        raise TMgenException(f"{name} must be finite and non-negative")
+    return array
 
 
 def diurnal_profile(
@@ -194,6 +226,125 @@ def fourier_profile(
             "lower the amplitudes or raise mean"
         )
     return profile
+
+
+def time_zone_profiles(
+    profile: ArrayLike, shifts: Sequence[int]
+) -> NDArray[numpy.float64]:
+    """
+    One copy of a cyclical *profile* per node, each delayed by a number of
+    epochs. It models nodes in different time zones whose traffic follows the
+    same daily cycle at different local times (Tune and Roughan, SIGCOMM 2015,
+    section 3.4).
+
+    Use the result as the *ingress_traffic* or *egress_traffic* of
+    :py:func:`ncim_tm`. The profile wraps around, so it should cover whole
+    cycles.
+
+    :param profile: one value per epoch, such as from :py:func:`diurnal_profile`
+    :param shifts: for each node, how many epochs its cycle lags behind
+        *profile* (negative to lead)
+    :return: an array of shape ``(len(shifts), len(profile))``; row ``i`` is
+        *profile* delayed by ``shifts[i]``
+    """
+    values = numpy.asarray(profile, dtype=numpy.float64)
+    if values.ndim != 1 or values.size == 0:
+        raise TMgenException("profile must be a non-empty one-dimensional array")
+    if len(shifts) == 0:
+        raise TMgenException("shifts must not be empty")
+    for shift in shifts:
+        if int(shift) != shift:
+            raise TMgenException(f"shifts must be whole epochs, got {shift!r}")
+    return numpy.stack([numpy.roll(values, int(shift)) for shift in shifts])
+
+
+def ncim_tm(
+    total_traffic: ArrayLike,
+    num_nodes: int | None = None,
+    *,
+    ingress_traffic: ArrayLike | None = None,
+    egress_traffic: ArrayLike | None = None,
+    spatial_variance: float = 0,
+    rng: RngLike = None,
+) -> TrafficMatrix:
+    """
+    Non-stationary conditionally independent model (NCIM, eqs. 14 and 15 of
+    Tune and Roughan, SIGCOMM 2015): every epoch is drawn independently, with
+    the traffic of each epoch following what you know about it.
+
+    Knowing only the mean total of each epoch, :math:`s(t)`, every entry is
+    exponential with mean :math:`s(t) / N^2`. Knowing in addition the mean
+    traffic entering and leaving each node, :math:`r_i(t)` and :math:`c_j(t)`,
+    the epoch is :math:`X(t) = s(t)\\, u(t) v(t)^T` with
+    :math:`u_i \\sim \\mathrm{Exp}(r_i / s)` and
+    :math:`v_j \\sim \\mathrm{Exp}(c_j / s)` (means), a gravity model with
+    random node weights whose mean is :math:`r_i c_j / s`. Shifting the
+    per-node cycles models nodes in different time zones, see
+    :py:func:`time_zone_profiles`.
+
+    The matrices include traffic from each node to itself (the diagonal).
+
+    :param total_traffic: the mean total traffic of each epoch, one
+        non-negative value per epoch; this sets the number of epochs
+    :param num_nodes: number of nodes. Needed only without *ingress_traffic*
+        and *egress_traffic*, otherwise it is read from them
+    :param ingress_traffic: the mean traffic entering at each node, shape
+        ``(num_nodes, num_epochs)``, or ``(num_nodes,)`` for a constant. Give
+        it together with *egress_traffic*
+    :param egress_traffic: the mean traffic leaving at each node, as above
+    :param spatial_variance: with node traffics given, the variance of each
+        node's traffic in squared traffic units: the weights then follow normal
+        distributions truncated at zero, as in :py:func:`modulated_gravity_tm`.
+        The default, 0, gives exponential weights
+    :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
+    :return: a new :py:class:`~TrafficMatrix`
+    """
+    total = _series(total_traffic, "total_traffic")
+    num_epochs = total.size
+    spatial_variance = _number(spatial_variance, "spatial_variance")
+    gen = _resolve_rng(rng)
+
+    if ingress_traffic is None and egress_traffic is None:
+        if num_nodes is None:
+            raise TMgenException(
+                "Give num_nodes, or ingress_traffic and egress_traffic"
+            )
+        if spatial_variance:
+            raise TMgenException(
+                "spatial_variance needs ingress_traffic and egress_traffic"
+            )
+        num_nodes = _count(num_nodes, "num_nodes")
+        scale = total / num_nodes**2
+        entries = gen.exponential(1.0, size=(num_nodes, num_nodes, num_epochs))
+        return TrafficMatrix._from_owned(entries * scale)
+
+    if ingress_traffic is None or egress_traffic is None:
+        raise TMgenException("Give both ingress_traffic and egress_traffic, or neither")
+    ingress = _node_traffic(ingress_traffic, num_epochs, "ingress_traffic")
+    egress = _node_traffic(egress_traffic, num_epochs, "egress_traffic")
+    if num_nodes is not None:
+        num_nodes = _count(num_nodes, "num_nodes")
+        if num_nodes != ingress.shape[0]:
+            raise TMgenException(
+                f"num_nodes is {num_nodes} but ingress_traffic has "
+                f"{ingress.shape[0]} nodes"
+            )
+    if egress.shape[0] != ingress.shape[0]:
+        raise TMgenException(
+            "ingress_traffic and egress_traffic must cover the same nodes"
+        )
+
+    scale = numpy.where(total > 0, total, 1.0)
+
+    def weights(node_traffic: NDArray[numpy.float64]) -> NDArray[numpy.float64]:
+        share = node_traffic / scale
+        if spatial_variance:
+            return _truncated_normal(gen, share, numpy.sqrt(spatial_variance) / scale)
+        return numpy.asarray(gen.exponential(1.0, size=share.shape) * share)
+
+    u = weights(ingress)
+    v = weights(egress)
+    return TrafficMatrix._from_owned(numpy.einsum("it,jt->ijt", u, v) * total)
 
 
 @renamed_arguments(

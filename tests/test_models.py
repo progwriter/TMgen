@@ -15,8 +15,10 @@ from tmgen.models import (
     gravity_tm,
     lognormal_tm,
     modulated_gravity_tm,
+    ncim_tm,
     random_gravity_tm,
     spike_tm,
+    time_zone_profiles,
     uniform_tm,
 )
 from tmgen.tm import TrafficMatrix
@@ -498,3 +500,120 @@ def test_modulated_gravity_follows_a_given_profile() -> None:
 def test_modulated_gravity_rejects_a_bad_profile(profile: Any) -> None:
     with pytest.raises(TMgenException):
         modulated_gravity_tm(3, 6, 1.0, profile=profile)
+
+
+def test_time_zone_profiles_delay_each_node() -> None:
+    profile = numpy.arange(6.0)
+    shifted = time_zone_profiles(profile, [0, 2, -1])
+    assert shifted.shape == (3, 6)
+    numpy.testing.assert_array_equal(shifted[0], profile)
+    numpy.testing.assert_array_equal(shifted[1], [4, 5, 0, 1, 2, 3])
+    numpy.testing.assert_array_equal(shifted[2], [1, 2, 3, 4, 5, 0])
+
+
+@pytest.mark.parametrize(
+    ("profile", "shifts"),
+    [([], [0]), ([[1.0]], [0]), ([1.0, 2.0], []), ([1.0, 2.0], [0.5])],
+)
+def test_time_zone_profiles_validate(profile: Any, shifts: Any) -> None:
+    with pytest.raises(TMgenException):
+        time_zone_profiles(profile, shifts)
+
+
+def test_ncim_entries_have_mean_total_over_n_squared() -> None:
+    total = numpy.full(4000, 40.0)
+    tm = ncim_tm(total, num_nodes=2, rng=0)
+    assert tm.shape == (2, 2, 4000)
+    numpy.testing.assert_allclose(tm.matrix.mean(axis=2), 10.0, rtol=0.1)
+    # exponential: the standard deviation equals the mean
+    numpy.testing.assert_allclose(tm.matrix.std(axis=2), 10.0, rtol=0.1)
+
+
+def test_ncim_epoch_means_follow_the_totals() -> None:
+    total = numpy.repeat([10.0, 1000.0], 2000)
+    tm = ncim_tm(total, num_nodes=3, rng=0)
+    means = tm.matrix.sum(axis=(0, 1))
+    assert means[:2000].mean() == pytest.approx(10.0, rel=0.05)
+    assert means[2000:].mean() == pytest.approx(1000.0, rel=0.05)
+
+
+def test_ncim_with_node_traffic_has_the_gravity_mean() -> None:
+    ingress = [6.0, 3.0, 1.0]
+    egress = [2.0, 2.0, 6.0]
+    tm = ncim_tm(
+        numpy.full(20000, 10.0), ingress_traffic=ingress, egress_traffic=egress, rng=0
+    )
+    expected = numpy.outer(ingress, egress) / 10.0
+    numpy.testing.assert_allclose(tm.matrix.mean(axis=2), expected, rtol=0.1)
+
+
+def test_ncim_time_zones_shift_the_busy_hour_of_each_node() -> None:
+    cycle = diurnal_profile(24, 10.0, peak_to_mean=1.9)
+    ingress = time_zone_profiles(cycle, [0, 12])
+    egress = numpy.full((2, 24), 5.0)
+    total = numpy.full(24, 20.0)
+    draws = [
+        ncim_tm(total, ingress_traffic=ingress, egress_traffic=egress, rng=i).matrix
+        for i in range(2000)
+    ]
+    by_ingress = numpy.mean(draws, axis=0).sum(axis=1)
+    expected = ingress * egress.sum(axis=0) / total
+    numpy.testing.assert_allclose(by_ingress, expected, rtol=0.2)
+    assert by_ingress[0].argmax() != by_ingress[1].argmax()
+
+
+def test_ncim_node_traffic_may_be_constant_in_time() -> None:
+    tm = ncim_tm(
+        [5.0, 5.0, 5.0], ingress_traffic=[1.0, 2.0], egress_traffic=[3.0, 4.0], rng=0
+    )
+    assert tm.shape == (2, 2, 3)
+
+
+def test_ncim_spatial_variance_gives_truncated_normal_weights() -> None:
+    kwargs: dict[str, Any] = {
+        "ingress_traffic": [6.0, 4.0],
+        "egress_traffic": [5.0, 5.0],
+    }
+    tm = ncim_tm(numpy.full(3000, 10.0), spatial_variance=1.0, rng=0, **kwargs)
+    assert (tm.matrix >= 0).all()
+    numpy.testing.assert_allclose(
+        tm.matrix.mean(axis=2), numpy.outer([6, 4], [5, 5]) / 10, rtol=0.1
+    )
+    plain = ncim_tm(numpy.full(3000, 10.0), rng=0, **kwargs)
+    assert tm.matrix.std() < plain.matrix.std()
+
+
+def test_ncim_zero_total_gives_an_empty_epoch() -> None:
+    tm = ncim_tm(
+        [0.0, 5.0], ingress_traffic=[1.0, 1.0], egress_traffic=[1.0, 1.0], rng=0
+    )
+    assert (tm.at_time(0) == 0).all()
+
+
+def test_ncim_is_reproducible() -> None:
+    a = ncim_tm(numpy.ones(5), 3, rng=7)
+    b = ncim_tm(numpy.ones(5), 3, rng=7)
+    assert a == b
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},
+        {"num_nodes": 2, "spatial_variance": 1.0},
+        {"ingress_traffic": [1.0, 1.0]},
+        {"ingress_traffic": [1.0, 1.0], "egress_traffic": [1.0, 1.0, 1.0]},
+        {"ingress_traffic": [1.0, 1.0], "egress_traffic": [1.0, 1.0], "num_nodes": 3},
+        {"ingress_traffic": numpy.ones((2, 4)), "egress_traffic": [1.0, 1.0]},
+        {"ingress_traffic": [1.0, -1.0], "egress_traffic": [1.0, 1.0]},
+    ],
+)
+def test_ncim_validates(kwargs: dict[str, Any]) -> None:
+    with pytest.raises(TMgenException):
+        ncim_tm(numpy.ones(3), **kwargs)
+
+
+@pytest.mark.parametrize("total", [[], [[1.0]], [-1.0], [numpy.nan]])
+def test_ncim_validates_the_totals(total: Any) -> None:
+    with pytest.raises(TMgenException):
+        ncim_tm(total, num_nodes=2)
