@@ -18,11 +18,16 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 - `tmgen.__version__`.
 - `lognormal_tm` is exported from `tmgen.models`.
 - Keyword-only `rng` argument (seed or `numpy.random.Generator`) on every
-  random model for reproducible, isolated randomness. Without it the models
+  random model and on `hmc_sample` for reproducible, isolated randomness. Without it the models
   still draw from NumPy's global state, so `numpy.random.seed` works as before.
 
 ### Changed
 
+- The HMC sampler is a typed Cython kernel that updates its working products
+  incrementally (Gram matrix), roughly 8-25x faster. Samples are statistically
+  equivalent but no longer bit-identical to the previous implementation for
+  a given seed. For very large constraint sets (more than 256 MiB of Gram
+  matrix) it falls back to recomputing the products.
 - `gravity_tm`, `spike_tm` and `modulated_gravity_tm` are vectorized
   (`gravity_tm` is hundreds of times faster for large networks); results are
   unchanged.

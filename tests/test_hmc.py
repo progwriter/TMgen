@@ -1,6 +1,8 @@
 import numpy
 import pytest
+from numpy.typing import NDArray
 
+from tmgen import hmc
 from tmgen.hmc import hmc_sample
 
 
@@ -21,3 +23,60 @@ def test_hmc_truncated_gaussian(covariance: bool) -> None:
     assert (xs > 0).all()
     # mean of a half-normal is sqrt(2/pi)
     assert xs.mean(axis=1) == pytest.approx(numpy.sqrt(2 / numpy.pi), abs=0.1)
+
+
+def _constrained_problem() -> tuple[NDArray[numpy.float64], ...]:
+    gen = numpy.random.default_rng(0)
+    d, m = 6, 14
+    extra = gen.normal(size=(m - d, d))
+    f = numpy.vstack([numpy.eye(d), extra])
+    # keep the all-ones starting point feasible
+    g = numpy.concatenate(
+        [numpy.zeros(d), numpy.abs(extra.sum(axis=1)) + gen.uniform(0.5, 2.0, m - d)]
+    )
+    return f, g, numpy.eye(d), numpy.zeros(d), numpy.ones(d)
+
+
+def test_samples_satisfy_constraints() -> None:
+    f, g, cov, mu, x0 = _constrained_problem()
+    xs = hmc_sample(f, g, cov, mu, x0, 500, rng=1)
+    assert ((f @ xs + g[:, None]) > 0).all()
+
+
+def test_rng_seed_is_reproducible() -> None:
+    f, g, cov, mu, x0 = _constrained_problem()
+    a = hmc_sample(f, g, cov, mu, x0, 50, rng=3)
+    b = hmc_sample(f, g, cov, mu, x0, 50, rng=numpy.random.default_rng(3))
+    numpy.testing.assert_array_equal(a, b)
+
+
+def test_global_seed_is_reproducible() -> None:
+    f, g, cov, mu, x0 = _constrained_problem()
+    numpy.random.seed(5)
+    a = hmc_sample(f, g, cov, mu, x0, 50)
+    numpy.random.seed(5)
+    b = hmc_sample(f, g, cov, mu, x0, 50)
+    numpy.testing.assert_array_equal(a, b)
+
+
+def test_matvec_fallback_matches_gram(monkeypatch: pytest.MonkeyPatch) -> None:
+    f, g, cov, mu, x0 = _constrained_problem()
+    with_gram = hmc_sample(f, g, cov, mu, x0, 200, rng=2)
+    monkeypatch.setattr(hmc, "MAX_GRAM_BYTES", 0)
+    without = hmc_sample(f, g, cov, mu, x0, 200, rng=2)
+    numpy.testing.assert_allclose(with_gram, without, atol=1e-6)
+
+
+def test_orthant_moments() -> None:
+    # half-normal in every coordinate: mean sqrt(2/pi), variance 1 - 2/pi
+    xs = hmc_sample(
+        numpy.eye(3),
+        numpy.zeros(3),
+        numpy.eye(3),
+        numpy.zeros(3),
+        numpy.ones(3),
+        20000,
+        rng=11,
+    )
+    assert xs.mean(axis=1) == pytest.approx(numpy.sqrt(2 / numpy.pi), abs=0.03)
+    assert xs.var(axis=1) == pytest.approx(1 - 2 / numpy.pi, abs=0.03)

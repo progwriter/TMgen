@@ -1,10 +1,142 @@
-# cython: cdivision=True
+# cython: cdivision=True, boundscheck=False, wraparound=False, language_level=3
 # coding: utf-8
 
 import numpy
 cimport numpy
 from cpython cimport bool
+from libc.math cimport acos, atan2, cos, fabs, sin, sqrt, INFINITY, M_PI, isfinite
 from numpy.linalg import cholesky
+
+# The Gram matrix G = F F^T costs m*m doubles. Above this size the kernel
+# falls back to recomputing F @ a and F @ b after every reflection.
+MAX_GRAM_BYTES = 268435456
+
+cdef double NEAR_ZERO = 10000 * 2.220446049250313e-16
+
+
+cdef void _matvec(double[:, ::1] f, double[::1] x, double[::1] out) noexcept nogil:
+    cdef Py_ssize_t k, j
+    cdef double s
+    for k in range(f.shape[0]):
+        s = 0
+        for j in range(f.shape[1]):
+            s += f[k, j] * x[j]
+        out[k] = s
+
+
+cdef numpy.ndarray _sample_loop(double[:, ::1] f, double[::1] g,
+                                double[::1] x0, int num_samples, object rng,
+                                Py_ssize_t max_gram_bytes):
+    """
+    Exact HMC on the whitened problem: sample x ~ N(0, I) with f x + g >= 0.
+
+    Between wall hits the particle moves along x(t) = a sin t + b cos t, so
+    f@a and f@b are all that is needed to find the next hit. After a
+    reflection a and b change by a rank-one term, and f@a, f@b can be updated
+    in O(m) from the Gram matrix instead of recomputed in O(m d).
+    """
+    cdef Py_ssize_t m = f.shape[0], d = f.shape[1]
+    cdef Py_ssize_t i = 1, k, j, jbest
+    cdef bint use_gram = m * m * 8 <= max_gram_bytes
+    cdef double[:, ::1] gram
+    cdef double[::1] f2 = numpy.empty(m)
+    if use_gram:
+        gram = numpy.ascontiguousarray(numpy.asarray(f) @ numpy.asarray(f).T)
+        for k in range(m):
+            f2[k] = gram[k, k]
+    else:
+        gram = numpy.empty((0, 0))
+        for k in range(m):
+            f2[k] = numpy.dot(f[k], f[k])
+
+    result = numpy.zeros((d, num_samples))
+    cdef double[:, ::1] out = result
+    cdef double[::1] a = numpy.zeros(d), b = numpy.zeros(d)
+    cdef double[::1] x = numpy.zeros(d), v = numpy.zeros(d)
+    cdef double[::1] fa = numpy.zeros(m), fb = numpy.zeros(m)
+    cdef double[::1] fx = numpy.zeros(m), fv = numpy.zeros(m)
+    cdef double[::1] last = numpy.array(x0), vel
+    cdef double u, t, best, move, tt, s, c, qj, ak, bk
+    cdef double total = M_PI / 2
+    cdef bint any_wall, stop, ok
+
+    for k in range(d):
+        out[k, 0] = x0[k]
+    while i < num_samples:
+        vel = rng.standard_normal(d)
+        for k in range(d):
+            a[k] = vel[k]
+            b[k] = last[k]
+        _matvec(f, a, fa)
+        _matvec(f, b, fb)
+        j = -1
+        tt = 0
+        while True:
+            best = INFINITY
+            jbest = -1
+            any_wall = False
+            for k in range(m):
+                ak = fa[k]
+                bk = fb[k]
+                u = sqrt(ak * ak + bk * bk)
+                if fabs(g[k] / u) <= 1.0:
+                    any_wall = True
+                    t = -atan2(-ak, bk) + acos(-g[k] / u)
+                    # the wall just hit would otherwise be found again
+                    # because of rounding
+                    if k == j and (fabs(t) < NEAR_ZERO
+                                   or fabs(t - 2 * M_PI) < NEAR_ZERO):
+                        t = INFINITY
+                    if t < best:
+                        best = t
+                        jbest = k
+            if any_wall and isfinite(best):
+                move = best
+                j = jbest
+            else:
+                move = total
+            tt += move
+            stop = tt >= total
+            if stop:
+                move -= tt - total
+            s = sin(move)
+            c = cos(move)
+            for k in range(d):
+                x[k] = a[k] * s + b[k] * c
+                v[k] = a[k] * c - b[k] * s
+            if stop:
+                break
+            for k in range(m):
+                fx[k] = fa[k] * s + fb[k] * c
+                fv[k] = fa[k] * c - fb[k] * s
+            qj = fv[j] / f2[j]
+            for k in range(d):
+                a[k] = v[k] - 2 * qj * f[j, k]
+                b[k] = x[k]
+            if use_gram:
+                for k in range(m):
+                    fa[k] = fv[k] - 2 * qj * gram[j, k]
+                    fb[k] = fx[k]
+            else:
+                _matvec(f, a, fa)
+                _matvec(f, b, fb)
+
+        # numerical error can push the endpoint outside the constraints
+        ok = True
+        for k in range(m):
+            t = g[k]
+            for j in range(d):
+                t += f[k, j] * x[j]
+            if t <= 0:
+                ok = False
+                break
+        if ok:
+            for k in range(d):
+                out[k, i] = x[k]
+                last[k] = x[k]
+            i += 1
+    return result
+
 
 cdef numpy.ndarray _mldivide(numpy.ndarray a, numpy.ndarray b):
     return numpy.linalg.solve(a, b)
@@ -15,7 +147,7 @@ cdef numpy.ndarray _mrdivide(numpy.ndarray a, numpy.ndarray b):
 cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
                              numpy.ndarray m, numpy.ndarray mu_r,
                              bool covariance, int num_samples,
-                             numpy.ndarray initial_x):
+                             numpy.ndarray initial_x, object rng):
 
 
     """
@@ -33,6 +165,8 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
     :param num_samples:
         number of desired samples
     :param initial_x: :math:`d \times 1` initialization vector, must satisfy the given constraints
+    :param rng: None to draw from the global NumPy state, otherwise a seed or
+        Generator
     :return:
         a :math:`d \times num_samples` matrix where each column is a sample
     """
@@ -61,109 +195,22 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
         initial_x = numpy.matmul(lower.T, initial_x - mu)
 
     cdef int d = initial_x.shape[0]
-    cdef int bounce_count = 0
-    cdef double near_zero = 10000 * numpy.finfo(numpy.float64).eps
 
     # Verify that initial_x is feasible
     cdef numpy.ndarray c = numpy.matmul(f, initial_x) + g
     if numpy.any(c < 0):
         raise ValueError('Error: Initial condition violates the constraints')
 
-    # squared norm of the rows of F, needed for reflecting the velocity
-    cdef numpy.ndarray f2 = numpy.sum(f * f, axis=1)
+    if rng is None:
+        # the global state keeps numpy.random.seed working
+        sampler = numpy.random.mtrand._rand
+    else:
+        sampler = numpy.random.default_rng(rng)
 
-    ## Sampling loop
-    cdef numpy.ndarray last_x = initial_x
-    result_xs = numpy.zeros((d, num_samples))
-    # print(result_xs.shape)
-    result_xs[:, 0] = initial_x
-
-    cdef int i = 1
-    cdef int stop, j, indj, m_ind = 0
-    cdef numpy.ndarray v0, x, a, b, fa, fb, u, phi, div_result, pn, phn, inds, cs, t1, v
-    cdef double total_move_time = numpy.pi / 2  # total time the particle will move
-    cdef double move_time, tt, tt1, qj = 0
-    while i < num_samples:
-        stop = 0
-        j = -1  # index of the last wall hit, -1 if none yet
-        v0 = numpy.random.randn(d)  # initial velocity
-        x = last_x
-
-        tt = 0  # records how much time the particle already moved
-
-        while True:
-            a = v0
-            a = numpy.real(a)
-            # print ('a', a)
-            b = x
-
-            fa = numpy.matmul(f, a)
-            fb = numpy.matmul(f, b)
-
-            u = numpy.sqrt(numpy.square(fa) + numpy.square(fb))
-            phi = numpy.arctan2(-fa, fb)  # -pi < phi < +pi
-
-            div_result = numpy.absolute(g/u)
-            pn = (div_result <= 1)  # these are the walls that may be hit
-
-            # find the first time constraint becomes zero
-            if numpy.any(pn):
-                inds = numpy.flatnonzero(pn)
-                phn = phi[pn]
-                t1 = -phn + numpy.arccos(
-                    -g[pn] / u[pn])  # time at which coordinates hit the walls
-                # this expression always gives the correct result because U*cos(phi + t) + g >= 0.
-
-
-                # if there was a previous reflection (j>0)
-                # and there is a potential reflection at the sample plane
-                # make sure that a new reflection at j is not found because of numerical error
-                if j >= 0:
-                    if pn[j]:
-                        cs = numpy.cumsum(pn)
-                        indj = cs[j] - 1
-                        tt1 = t1[indj]
-                        if numpy.absolute(tt1) < near_zero or numpy.absolute(
-                                        tt1 - 2 * numpy.pi) < near_zero:
-                            t1[indj] = numpy.inf
-
-                m_ind = numpy.argmin(t1)
-                move_time = t1[m_ind]
-
-                # find the reflection plane
-                # j is an index in the full vector of dim-m, not in the restriced vector determined by pn.
-                j = inds[m_ind]
-            else:  #if pn(i) =0 for all i
-                move_time = total_move_time
-            tt += move_time
-            if tt >= total_move_time:
-                move_time = move_time - (tt - total_move_time)
-                stop = 1
-
-            # move the particle at time move_time
-            x = a * numpy.sin(move_time) + b * numpy.cos(move_time)
-            v = a * numpy.cos(move_time) - b * numpy.sin(move_time)
-            # print(x,v)
-
-            if stop:
-                # print('stop')
-                break
-
-            # compute reflected velocity
-            qj = numpy.dot(f[j, :], v) / f2[j]
-            v0 = v - 2 * qj * f[j, :]
-            bounce_count += 1
-
-        # at this point we have a sampled value X, but due to possible
-        # numerical instabilities we check that the candidate X satisfies the
-        # constraints before accepting it.
-
-        if numpy.all(numpy.matmul(f, x) + g > 0):
-            result_xs[:, i] = x
-            last_x = x
-            i += 1
-        # else:
-        #     print('HMC reject')
+    result_xs = _sample_loop(numpy.ascontiguousarray(f),
+                             numpy.ascontiguousarray(g),
+                             numpy.ascontiguousarray(initial_x),
+                             num_samples, sampler, MAX_GRAM_BYTES)
 
     # transform back to the unwhitened frame
     if covariance:
@@ -174,11 +221,14 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
     return result_xs
 
 
-def hmc_sample(f, g, m, mu_r, initial_x, int num_samples, covariance=True):
+def hmc_sample(f, g, m, mu_r, initial_x, int num_samples, covariance=True,
+               *, rng=None):
     """
     Python-visible wrapper around :py:func:`hmc_exact`.
     Samples a Gaussian subject to :math:`f x + g \\geq 0`.
 
+    :param rng: seed or :py:class:`numpy.random.Generator`; ``None`` draws
+        from NumPy's global state
     :return: a :math:`d \\times num\\_samples` array, one sample per column
     """
     return hmc_exact(numpy.asarray(f, dtype=numpy.float64),
@@ -186,4 +236,4 @@ def hmc_sample(f, g, m, mu_r, initial_x, int num_samples, covariance=True):
                      numpy.asarray(m, dtype=numpy.float64),
                      numpy.asarray(mu_r, dtype=numpy.float64),
                      bool(covariance), num_samples,
-                     numpy.asarray(initial_x, dtype=numpy.float64))
+                     numpy.asarray(initial_x, dtype=numpy.float64), rng)

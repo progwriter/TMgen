@@ -9,4 +9,6 @@ def hmc_sample(
     initial_x: ArrayLike,
     num_samples: int,
     covariance: bool = True,
+    *,
+    rng: numpy.random.Generator | int | None = None,
 ) -> NDArray[numpy.float64]: ...
