@@ -151,6 +151,19 @@ class TrafficMatrix:
         """
         return TrafficMatrix._from_owned(self.matrix.max(axis=2, keepdims=True))
 
+    def zero_diagonal(self) -> "TrafficMatrix":
+        """
+        Return a new traffic matrix with the diagonal (traffic from a node to
+        itself) set to zero in every epoch. The totals decrease by the volume
+        removed.
+
+        :return: a new TrafficMatrix
+        """
+        matrix = self.matrix.copy()
+        nodes = numpy.arange(self.num_nodes())
+        matrix[nodes, nodes, :] = 0
+        return TrafficMatrix._from_owned(matrix)
+
     def num_nodes(self) -> int:
         """
         :return: The number of nodes in this traffic matrix

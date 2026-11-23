@@ -12,6 +12,7 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Added
 
+- `TrafficMatrix.zero_diagonal()`, which returns a copy without self-traffic.
 - `tmgen.hmc.hmc_sample`, a Python-visible wrapper around the truncated
   Gaussian HMC sampler.
 - Type stubs and a `py.typed` marker.
@@ -46,7 +47,7 @@ time, rename that section to the new version and date (see `RELEASING.md`).
   `normalize=True` for an exact total, or `symmetric=True` to share the
   weights between rows and columns (the total is then `mean_traffic * (1 +
   1/num_nodes)` on average). The docs now say that `mean_traffic` is the
-  total, not the per-pair average, and show how to zero the diagonal.
+  total, not the per-pair average.
 - `spike_tm` follows the paper: `num_spikes` is the total number of spikes
   over the whole `num_nodes x num_nodes x num_epochs` array, chosen uniformly,
   instead of that many per epoch. Multi-epoch results change.

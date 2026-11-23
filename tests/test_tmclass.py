@@ -101,3 +101,20 @@ def test_pickle_round_trip(tmp_path: Path) -> None:
     loaded = TrafficMatrix.from_pickle(path)
     numpy.testing.assert_array_equal(loaded.matrix, tm.matrix)
     assert not loaded.matrix.flags.writeable
+
+
+def test_zero_diagonal() -> None:
+    tm = TrafficMatrix(numpy.random.default_rng(0).random((4, 4, 3)) + 1)
+    result = tm.zero_diagonal()
+    for epoch in range(3):
+        assert not numpy.diag(result.at_time(epoch)).any()
+    off_diagonal = ~numpy.eye(4, dtype=bool)
+    numpy.testing.assert_array_equal(
+        result.matrix[off_diagonal], tm.matrix[off_diagonal]
+    )
+    assert numpy.diag(tm.at_time(0)).all()  # the original is unchanged
+    assert not result.matrix.flags.writeable
+
+
+def test_zero_diagonal_of_a_single_node() -> None:
+    assert not TrafficMatrix(numpy.ones((1, 1, 2))).zero_diagonal().matrix.any()

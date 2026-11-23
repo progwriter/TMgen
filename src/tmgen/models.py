@@ -227,12 +227,8 @@ def random_gravity_tm(
     average, and to a random value in any one draw; use *normalize* for an
     exact total.
 
-    The matrix includes traffic from each node to itself (the diagonal). To
-    remove it, copy the data and zero the diagonal, which lowers the total::
-
-        m = tm.matrix.copy()
-        numpy.fill_diagonal(m[:, :, 0], 0)
-        tm = TrafficMatrix(m)
+    The matrix includes traffic from each node to itself (the diagonal); use
+    :py:meth:`TrafficMatrix.zero_diagonal` to remove it.
 
     :param num_nodes: number of nodes in the network
     :param mean_traffic: the total traffic volume of the matrix, in
