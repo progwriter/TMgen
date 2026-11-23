@@ -88,8 +88,10 @@ See :ref:`API` for all supported functions.
 Saving/Loading a traffic matrix
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-TMs can be easily loaded using the python-native pickle format:
+A traffic matrix can be saved to, and loaded from, a compressed NumPy ``.npz``
+file. Loading never runs code from the file, so it is safe for files you did not
+create:
 
 >>> from tmgen import TrafficMatrix
->>> tm.to_pickle('mytm')
->>> tm = TrafficMatrix.from_pickle('mytm')
+>>> tm.save('mytm.npz')
+>>> tm = TrafficMatrix.load('mytm.npz')

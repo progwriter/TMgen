@@ -30,9 +30,10 @@ class InjectorBase(ABC):
     def _load_tm(self, tm_fname: str | os.PathLike[str]) -> None:
         """
         Load the traffic matrix from disk
-        :param tm_fname: the TM fileame (file must be in pickle format)
+        :param tm_fname: the TM file name (a file written by
+            :py:meth:`TrafficMatrix.save`)
         """
-        self.tm = TrafficMatrix.from_pickle(tm_fname)
+        self.tm = TrafficMatrix.load(tm_fname)
 
     @abstractmethod
     def run(self) -> None:

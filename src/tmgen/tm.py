@@ -1,6 +1,7 @@
 import os
 import pickle
 import warnings
+import zipfile
 from typing import Literal, overload
 
 import numpy
@@ -10,6 +11,8 @@ from tmgen._compat import renamed_arguments
 from tmgen.exceptions import TMgenException
 
 _Path = str | os.PathLike[str]
+
+FORMAT_VERSION = 1
 
 
 _LEGACY_AGGREGATIONS: dict[str, str | None] = {
@@ -137,12 +140,67 @@ class TrafficMatrix:
             return float(numpy.max(series))
         return float(numpy.mean(series))
 
-    def to_pickle(self, fname: _Path) -> None:
+    def save(self, fname: _Path) -> None:
         """
-        Save the matrix to a python pickle file
+        Save the matrix to a compressed NumPy ``.npz`` file, which
+        :py:meth:`load` reads back. Unlike a pickle, loading it cannot run
+        code. The file name is used as given, so include the ``.npz``
+        extension.
 
         :param fname: the file name
         """
+        with open(fname, "wb") as f:
+            numpy.savez_compressed(
+                f,
+                matrix=self.matrix,
+                format_version=numpy.int64(FORMAT_VERSION),
+            )
+
+    @staticmethod
+    def load(fname: _Path) -> "TrafficMatrix":
+        """
+        Load a traffic matrix saved with :py:meth:`save`. Pickled data is
+        never loaded, so files from untrusted sources are safe to read.
+
+        :param fname: the file name on disk
+        :return: new TrafficMatrix
+        :raises TMgenException: if the file is not a TMgen file, or was written
+            by a newer version of TMgen
+        """
+        not_ours = TMgenException(f"{fname} is not a TMgen traffic matrix file")
+        try:
+            data = numpy.load(fname, allow_pickle=False)
+        except (ValueError, zipfile.BadZipFile) as err:
+            raise not_ours from err
+        if not isinstance(data, numpy.lib.npyio.NpzFile):
+            raise not_ours
+        with data:
+            if "matrix" not in data.files or "format_version" not in data.files:
+                raise not_ours
+            try:
+                version = int(data["format_version"])
+                matrix = data["matrix"]
+            except (TypeError, ValueError) as err:  # e.g. object arrays
+                raise not_ours from err
+            if version > FORMAT_VERSION:
+                raise TMgenException(
+                    f"{fname} uses file format version {version}, but this "
+                    f"version of TMgen reads up to {FORMAT_VERSION}"
+                )
+        return TrafficMatrix(matrix)  # validates data from outside
+
+    def to_pickle(self, fname: _Path) -> None:
+        """
+        Save the matrix to a python pickle file.
+
+        .. deprecated:: 0.2
+            Use :py:meth:`save`, which writes a file that is safe to load.
+
+        :param fname: the file name
+        """
+        warnings.warn(
+            "to_pickle is deprecated, use save", DeprecationWarning, stacklevel=2
+        )
         with open(fname, "wb") as f:
             pickle.dump(self.matrix, f)
 
@@ -205,11 +263,20 @@ class TrafficMatrix:
     @staticmethod
     def from_pickle(fname: _Path) -> "TrafficMatrix":
         """
-        Load a TrafficMatrix object from a file
+        Load a TrafficMatrix object from a pickle file.
+
+        .. deprecated:: 0.2
+            Use :py:meth:`load`. Unpickling can run arbitrary code, so only
+            load pickle files you created yourself.
 
         :param fname: the file name on disk
         :return: new TrafficMatrix
         """
+        warnings.warn(
+            "from_pickle is deprecated, use load (pickles can run code when loaded)",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         with open(fname, "rb") as f:
             return TrafficMatrix(pickle.load(f))
 

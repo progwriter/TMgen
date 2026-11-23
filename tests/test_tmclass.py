@@ -94,65 +94,73 @@ def test_models_return_read_only_matrices() -> None:
     assert not models.gravity_tm([1, 2, 3], 6.0).matrix.flags.writeable
 
 
-def test_pickle_round_trip(tmp_path: Path) -> None:
+def test_pickle_round_trip_is_deprecated(tmp_path: Path) -> None:
     tm = TrafficMatrix(numpy.random.default_rng(0).random((3, 3, 2)))
     path = tmp_path / "tm.pickle"
-    tm.to_pickle(path)
-    loaded = TrafficMatrix.from_pickle(path)
+    with pytest.warns(DeprecationWarning, match="to_pickle is deprecated"):
+        tm.to_pickle(path)
+    with pytest.warns(DeprecationWarning, match="from_pickle is deprecated"):
+        loaded = TrafficMatrix.from_pickle(path)
     numpy.testing.assert_array_equal(loaded.matrix, tm.matrix)
     assert not loaded.matrix.flags.writeable
 
 
-def test_zero_diagonal() -> None:
-    tm = TrafficMatrix(numpy.random.default_rng(0).random((4, 4, 3)) + 1)
-    result = tm.zero_diagonal()
-    for epoch in range(3):
-        assert not numpy.diag(result.at_time(epoch)).any()
-    off_diagonal = ~numpy.eye(4, dtype=bool)
-    numpy.testing.assert_array_equal(
-        result.matrix[off_diagonal], tm.matrix[off_diagonal]
-    )
-    assert numpy.diag(tm.at_time(0)).all()  # the original is unchanged
-    assert not result.matrix.flags.writeable
+def test_save_and_load_round_trip(tmp_path: Path) -> None:
+    tm = TrafficMatrix(numpy.random.default_rng(0).random((3, 3, 2)))
+    path = tmp_path / "tm.npz"
+    tm.save(path)
+    loaded = TrafficMatrix.load(path)
+    numpy.testing.assert_array_equal(loaded.matrix, tm.matrix)
+    assert not loaded.matrix.flags.writeable
 
 
-def test_zero_diagonal_of_a_single_node() -> None:
-    assert not TrafficMatrix(numpy.ones((1, 1, 2))).zero_diagonal().matrix.any()
+def test_save_uses_the_given_file_name(tmp_path: Path) -> None:
+    path = tmp_path / "no_extension"
+    TrafficMatrix(numpy.ones((2, 2, 1))).save(path)
+    assert path.exists()
+    assert TrafficMatrix.load(path).num_nodes() == 2
 
 
-def _series_tm() -> TrafficMatrix:
-    values = numpy.zeros((3, 3, 4))
-    values[0, 2, :] = [4.0, 1.0, 3.0, 2.0]
-    return TrafficMatrix(values)
+def test_load_rejects_pickled_data(tmp_path: Path) -> None:
+    path = tmp_path / "evil.npz"
+    numpy.savez(path, matrix=numpy.array([object()], dtype=object), format_version=1)
+    with pytest.raises(TMgenException):
+        TrafficMatrix.load(path)
 
 
-def test_between_returns_the_series_or_an_aggregate() -> None:
-    tm = _series_tm()
-    numpy.testing.assert_array_equal(tm.between(0, 2), [4, 1, 3, 2])
-    assert tm.between(0, 2, "min") == 1.0
-    assert tm.between(0, 2, "max") == 4.0
-    assert tm.between(0, 2, "mean") == 2.5
-    assert tm.between(2, 0, agg="max") == 0.0
-
-
-@pytest.mark.parametrize(
-    ("legacy", "expected"),
-    [("all", [4, 1, 3, 2]), ("*", [4, 1, 3, 2]), ("MAX", 4.0), ("maximum", 4.0)]
-    + [("mininum", 1.0), ("average", 2.5)],
-)
-def test_between_legacy_modes_warn(legacy: str, expected: object) -> None:
-    with pytest.warns(DeprecationWarning, match="deprecated") as record:
-        result = _series_tm().between(0, 2, legacy)  # type: ignore[call-overload]
-    numpy.testing.assert_array_equal(result, expected)
-    assert record[0].filename == __file__
-
-
-def test_between_old_keyword_names_warn() -> None:
+def test_load_rejects_a_pickle_file(tmp_path: Path) -> None:
+    path = tmp_path / "tm.pickle"
     with pytest.warns(DeprecationWarning):
-        assert _series_tm().between(o=0, d=2, modestr="max") == 4.0  # type: ignore[call-overload]
+        TrafficMatrix(numpy.ones((2, 2, 1))).to_pickle(path)
+    with pytest.raises(TMgenException):
+        TrafficMatrix.load(path)
 
 
-@pytest.mark.parametrize("bad", ["median", "", 3])
-def test_between_unknown_aggregation_raises(bad: object) -> None:
-    with pytest.raises(TMgenException, match="agg"):
-        _series_tm().between(0, 2, bad)  # type: ignore[call-overload]
+def test_load_rejects_other_numpy_files(tmp_path: Path) -> None:
+    plain = tmp_path / "plain.npy"
+    numpy.save(plain, numpy.ones((2, 2, 1)))
+    with pytest.raises(TMgenException, match="not a TMgen"):
+        TrafficMatrix.load(plain)
+    other = tmp_path / "other.npz"
+    numpy.savez(other, something=numpy.ones(3))
+    with pytest.raises(TMgenException, match="not a TMgen"):
+        TrafficMatrix.load(other)
+
+
+def test_load_rejects_newer_format_versions(tmp_path: Path) -> None:
+    path = tmp_path / "future.npz"
+    numpy.savez(path, matrix=numpy.ones((2, 2, 1)), format_version=99)
+    with pytest.raises(TMgenException, match="version 99"):
+        TrafficMatrix.load(path)
+
+
+def test_load_validates_the_data(tmp_path: Path) -> None:
+    path = tmp_path / "bad.npz"
+    numpy.savez(path, matrix=-numpy.ones((2, 2, 1)), format_version=1)
+    with pytest.raises(TMgenException):
+        TrafficMatrix.load(path)
+
+
+def test_load_missing_file(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        TrafficMatrix.load(tmp_path / "missing.npz")

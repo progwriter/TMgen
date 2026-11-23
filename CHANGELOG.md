@@ -12,6 +12,8 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Added
 
+- `TrafficMatrix.save` and `TrafficMatrix.load`: a compressed `.npz` format with
+  a version number. Loading never unpickles, so it is safe for untrusted files.
 - `TrafficMatrix.zero_diagonal()`, which returns a copy without self-traffic.
 - `tmgen.hmc.hmc_sample`, a Python-visible wrapper around the truncated
   Gaussian HMC sampler.
@@ -24,6 +26,10 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- `TrafficMatrix.to_pickle` and `from_pickle` are deprecated in favor of `save`
+  and `load`, because unpickling can run arbitrary code. The D-ITG injector now
+  reads `.npz` files written by `save` (convert old pickles with `from_pickle`
+  and `save`).
 - `TrafficMatrix.between(ingress, egress, agg=None)` replaces
   `between(o, d, modestr='all')`: `agg` is `None` for the series over the
   epochs, or `'min'`, `'max'` or `'mean'` for a single number, and the return
