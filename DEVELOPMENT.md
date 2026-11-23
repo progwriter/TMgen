@@ -69,7 +69,10 @@ The pre-commit hooks cover everything above except `pytest`. Notes:
   `fail_under` threshold in `pyproject.toml`. Run it locally with
   `pytest --cov`. The compiled `hmc` module cannot be traced, so it does not
   count towards the percentage even though `tests/test_hmc.py` exercises it.
-  The report appears in the job summary and as a `coverage-xml` artifact.
+  The report appears in the job summary and as a `coverage-xml` artifact. The same report
+  is uploaded to [Codecov](https://codecov.io/gh/progwriter/TMgen) (the
+  `CODECOV_TOKEN` repository secret; a failed upload does not fail CI), which
+  feeds the badge in the README.
 
 ## Benchmarks
 

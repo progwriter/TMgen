@@ -43,6 +43,13 @@ jobs:
         with:
           name: coverage-xml
           path: coverage.xml
+      - uses: codecov/codecov-action@v7
+        # Pull requests from forks have no secret; they upload without a token
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.python == '3.12' }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          fail_ci_if_error: false
 
   pre-commit:
     # Same hooks developers run locally, including the strict docs build

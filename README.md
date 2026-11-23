@@ -2,6 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/tmgen)](https://pypi.org/project/tmgen/)
 [![Docs](https://readthedocs.org/projects/tmgen/badge/?version=latest)](https://tmgen.readthedocs.io/)
+[![Coverage](https://codecov.io/gh/progwriter/TMgen/graph/badge.svg)](https://codecov.io/gh/progwriter/TMgen)
 
 TMgen generates synthetic network **traffic matrices**: how much traffic flows
 from each node of a network to each other node, optionally over time. Use it to
