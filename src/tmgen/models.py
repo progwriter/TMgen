@@ -347,6 +347,86 @@ def ncim_tm(
     return TrafficMatrix._from_owned(numpy.einsum("it,jt->ijt", u, v) * total)
 
 
+def traffic_class_tm(
+    total_traffic: ArrayLike,
+    node_classes: ArrayLike,
+    class_fractions: ArrayLike,
+    *,
+    rng: RngLike = None,
+) -> TrafficMatrix:
+    """
+    Traffic classes (eq. 17 of Tune and Roughan, SIGCOMM 2015): nodes belong to
+    classes, such as access and peering nodes, and you say what fraction of the
+    traffic goes from each class to each class. Within a pair of classes
+    traffic follows a random gravity model, so ingress and egress nodes are
+    independent only inside their class.
+
+    Epoch :math:`t` is :math:`X(t) = T(t) \\sum_{m,n} q_{mn}(t)\\, u_m(t) v_n(t)^T`,
+    where :math:`T(t)` is *total_traffic*, :math:`q_{mn}` the fraction of
+    traffic from class :math:`m` to class :math:`n`, and :math:`u_m`
+    (:math:`v_n`) holds exponential weights, scaled to sum to 1, for the nodes
+    of class :math:`m` as ingress (class :math:`n` as egress) and zero for the
+    others. The traffic from class :math:`m` to class :math:`n` in an epoch is
+    therefore exactly :math:`T(t) q_{mn}(t)`.
+
+    The matrices include traffic from each node to itself (the diagonal).
+
+    :param total_traffic: the total traffic of each epoch, one non-negative
+        value per epoch; this sets the number of epochs
+    :param node_classes: the class of each node, a whole number from 0 to
+        ``num_classes - 1``; every class needs at least one node
+    :param class_fractions: the fractions :math:`q`: shape
+        ``(num_classes, num_classes)`` where entry ``[m, n]`` is the share of
+        traffic from class ``m`` to class ``n``, or
+        ``(num_classes, num_classes, num_epochs)`` to vary it over time. Non-negative
+        and summing to 1 in every epoch
+    :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
+    :return: a new :py:class:`~TrafficMatrix`
+    """
+    total = _series(total_traffic, "total_traffic")
+    num_epochs = total.size
+    labels = numpy.asarray(node_classes)
+    if (
+        labels.ndim != 1
+        or labels.size == 0
+        or not numpy.issubdtype(labels.dtype, numpy.integer)
+    ):
+        raise TMgenException("node_classes must be a non-empty list of whole numbers")
+    num_classes = int(labels.max()) + 1
+    if labels.min() < 0 or numpy.bincount(labels, minlength=num_classes).min() == 0:
+        raise TMgenException(
+            "node_classes must number the classes from 0 and use every class"
+        )
+    fractions = numpy.asarray(class_fractions, dtype=numpy.float64)
+    if fractions.shape == (num_classes, num_classes):
+        fractions = numpy.repeat(fractions[:, :, None], num_epochs, axis=2)
+    if fractions.shape != (num_classes, num_classes, num_epochs):
+        raise TMgenException(
+            f"class_fractions must have shape ({num_classes}, {num_classes}) or "
+            f"({num_classes}, {num_classes}, {num_epochs}), got {fractions.shape}"
+        )
+    if (
+        not numpy.isfinite(fractions).all()
+        or (fractions < 0).any()
+        or not numpy.allclose(fractions.sum(axis=(0, 1)), 1.0)
+    ):
+        raise TMgenException(
+            "class_fractions must be non-negative and sum to 1 in every epoch"
+        )
+    gen = _resolve_rng(rng)
+
+    def weights() -> NDArray[numpy.float64]:
+        raw = gen.exponential(1.0, size=(labels.size, num_epochs))
+        for c in range(num_classes):
+            members = labels == c
+            raw[members] /= raw[members].sum(axis=0)
+        return numpy.asarray(raw)
+
+    pair_fraction = fractions[labels][:, labels]
+    matrix = numpy.einsum("it,jt->ijt", weights(), weights()) * pair_fraction * total
+    return TrafficMatrix._from_owned(matrix)
+
+
 @renamed_arguments(
     num_tms="num_epochs",
     mean_traffic="total_traffic",

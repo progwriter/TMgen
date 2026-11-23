@@ -242,11 +242,45 @@ a network that spans time zones: here the second node is 12 hours behind.
 >>> world.shape
 (2, 2, 24)
 
+Traffic classes
+---------------
+
+When nodes fall into groups with different traffic patterns, such as access and
+peering nodes, :py:func:`~tmgen.models.traffic_class_tm` takes a class for each
+node and the fraction of the total that flows from each class to each class.
+Inside a pair of classes the traffic is random gravity. The traffic between two
+classes is exactly its fraction of the total:
+
+>>> from tmgen.models import traffic_class_tm
+>>> classes = [0, 0, 1, 1, 1]  # two access nodes, then three peers
+>>> fractions = [[0.1, 0.5], [0.3, 0.1]]  # fractions[m][n]: from class m to n
+>>> tm = traffic_class_tm([100.0, 120.0], classes, fractions, rng=1)
+>>> round(float(tm.matrix[:2, 2:, 0].sum()), 6)  # access to peers, first epoch
+50.0
+
+Pass a ``(num_classes, num_classes, num_epochs)`` array to change the fractions
+over time.
+
+Large flows, spikes and noise
+-----------------------------
+
+The paper models real traffic as the sum of independent parts: large flows
+with a daily cycle, spikes, and small noise-like flows. Each part is a model of
+its own, and matrices of the same shape add:
+
+>>> from tmgen.models import exp_tm, spike_tm
+>>> large = modulated_gravity_tm(num_nodes=6, num_epochs=24, total_traffic=1000, rng=1)
+>>> spikes = spike_tm(num_nodes=6, num_spikes=3, mean_spike=500.0, num_epochs=24, rng=2)
+>>> noise = exp_tm(num_nodes=6, mean_entry=1.0, num_epochs=24, rng=3)
+>>> day = large + spikes + noise
+>>> day.shape
+(6, 6, 24)
+
 Not available yet
 -----------------
 
-The paper also describes models that TMgen does not expose yet: traffic
-classes and the general maximum entropy model with arbitrary constraints. The sampler they rely on is
+The paper's general maximum entropy model, with arbitrary linear constraints,
+is not exposed yet. The sampler they rely on is
 available as :py:func:`~tmgen.hmc.hmc_sample`, see :doc:`sampling`.
 
 References

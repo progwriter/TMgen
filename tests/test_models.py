@@ -19,6 +19,7 @@ from tmgen.models import (
     random_gravity_tm,
     spike_tm,
     time_zone_profiles,
+    traffic_class_tm,
     uniform_tm,
 )
 from tmgen.tm import TrafficMatrix
@@ -617,3 +618,72 @@ def test_ncim_validates(kwargs: dict[str, Any]) -> None:
 def test_ncim_validates_the_totals(total: Any) -> None:
     with pytest.raises(TMgenException):
         ncim_tm(total, num_nodes=2)
+
+
+def test_traffic_class_totals_between_classes_are_exact() -> None:
+    classes = [0, 0, 1, 1, 1]
+    q = numpy.array([[0.5, 0.2], [0.1, 0.2]])
+    total = numpy.array([100.0, 40.0, 0.0])
+    tm = traffic_class_tm(total, classes, q, rng=0).matrix
+    for m in range(2):
+        for n in range(2):
+            block = tm[numpy.ix_(numpy.array(classes) == m, numpy.array(classes) == n)]
+            numpy.testing.assert_allclose(block.sum(axis=(0, 1)), total * q[m, n])
+    numpy.testing.assert_allclose(tm.sum(axis=(0, 1)), total)
+
+
+def test_traffic_class_fractions_may_vary_in_time() -> None:
+    q = numpy.zeros((2, 2, 2))
+    q[0, 1, 0] = 1.0
+    q[1, 0, 1] = 1.0
+    tm = traffic_class_tm([10.0, 10.0], [0, 1], q, rng=0).matrix
+    assert tm[0, 1, 0] == pytest.approx(10.0)
+    assert tm[1, 0, 1] == pytest.approx(10.0)
+    assert tm[0, 1, 1] == 0
+    assert tm[1, 0, 0] == 0
+
+
+def test_traffic_class_weights_are_independent_inside_a_class() -> None:
+    tm = traffic_class_tm(numpy.full(200, 10.0), [0, 0, 0], [[1.0]], rng=0).matrix
+    assert numpy.linalg.matrix_rank(tm[:, :, 0]) == 1
+    assert not numpy.allclose(tm, tm.transpose(1, 0, 2))
+
+
+def test_traffic_class_with_one_class_is_random_gravity_with_exact_total() -> None:
+    tm = traffic_class_tm([7.0], [0, 0, 0, 0], [[1.0]], rng=1)
+    assert tm.shape == (4, 4, 1)
+    assert tm.matrix.sum() == pytest.approx(7.0)
+
+
+def test_traffic_class_is_reproducible() -> None:
+    args: tuple[Any, ...] = ([1.0, 2.0], [0, 1, 1], [[0.5, 0.25], [0.125, 0.125]])
+    assert traffic_class_tm(*args, rng=3) == traffic_class_tm(*args, rng=3)
+
+
+@pytest.mark.parametrize(
+    "node_classes",
+    [[], [[0, 1]], [0.5, 1.0], [-1, 0], [0, 2], ["a", "b"]],
+)
+def test_traffic_class_validates_the_classes(node_classes: Any) -> None:
+    with pytest.raises(TMgenException):
+        traffic_class_tm([1.0], node_classes, numpy.full((2, 2), 0.25))
+
+
+@pytest.mark.parametrize(
+    "fractions",
+    [
+        numpy.full((2, 2), 0.3),
+        numpy.full((3, 3), 1 / 9),
+        numpy.full((2, 2, 2), 0.25),
+        [[1.5, -0.5], [0.0, 0.0]],
+        [[numpy.nan, 0.0], [0.0, 1.0]],
+    ],
+)
+def test_traffic_class_validates_the_fractions(fractions: Any) -> None:
+    with pytest.raises(TMgenException):
+        traffic_class_tm([1.0], [0, 1], fractions)
+
+
+def test_traffic_class_validates_the_totals() -> None:
+    with pytest.raises(TMgenException):
+        traffic_class_tm([-1.0], [0, 1], numpy.full((2, 2), 0.25))
