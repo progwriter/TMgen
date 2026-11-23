@@ -130,3 +130,17 @@ def test_degenerate_constraints_raise_instead_of_looping(
     f = numpy.array([[1.0, 0.0], [0.0, 0.0]])
     with pytest.raises(TMgenException, match="consecutive rejections"):
         hmc_sample(f, numpy.zeros(2), numpy.eye(2), numpy.zeros(2), numpy.ones(2), 5)
+
+
+def test_covariance_flag_is_keyword_only() -> None:
+    args = (
+        numpy.eye(2),
+        numpy.zeros(2),
+        numpy.eye(2),
+        numpy.zeros(2),
+        numpy.ones(2),
+        3,
+    )
+    with pytest.raises(TypeError):
+        hmc_sample(*args, False)  # type: ignore[call-arg]
+    assert hmc_sample(*args, covariance=False).shape == (2, 3)

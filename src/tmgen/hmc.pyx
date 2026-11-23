@@ -248,15 +248,27 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
     return result_xs
 
 
-def hmc_sample(f, g, m, mu_r, initial_x, int num_samples, covariance=True,
-               *, rng=None):
+def hmc_sample(f, g, m, mu_r, initial_x, int num_samples, *, covariance=True,
+               rng=None):
     """
-    Python-visible wrapper around :py:func:`hmc_exact`.
-    Samples a Gaussian subject to :math:`f x + g \\geq 0`.
+    Sample a Gaussian truncated to :math:`f x + g \\geq 0` with exact
+    Hamiltonian Monte Carlo (Pakman and Paninski, arXiv:1208.4118).
 
+    :param f: the :math:`m \\times d` constraint matrix
+    :param g: the length :math:`m` constraint offset
+    :param m: the :math:`d \\times d` symmetric positive definite covariance
+        matrix, or the precision matrix if *covariance* is False
+    :param mu_r: the length :math:`d` mean, or the linear term of the
+        log-density if *covariance* is False
+    :param initial_x: a length :math:`d` starting point that satisfies the
+        constraints. It is the first sample returned
+    :param num_samples: number of samples (columns) to return, at least 1
+    :param covariance: whether *m* is the covariance (default) or the precision
     :param rng: seed or :py:class:`numpy.random.Generator`; ``None`` draws
         from NumPy's global state
     :return: a :math:`d \\times num\\_samples` array, one sample per column
+    :raises TMgenException: for inconsistent shapes, an infeasible starting
+        point, or constraints that no candidate can satisfy
     """
     return hmc_exact(numpy.asarray(f, dtype=numpy.float64),
                      numpy.asarray(g, dtype=numpy.float64),

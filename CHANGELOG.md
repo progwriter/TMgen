@@ -28,7 +28,7 @@ time, rename that section to the new version and date (see `RELEASING.md`).
   a version number. Loading never unpickles, so it is safe for untrusted files.
 - `TrafficMatrix.zero_diagonal()`, which returns a copy without self-traffic.
 - `tmgen.hmc.hmc_sample`, a Python-visible wrapper around the truncated
-  Gaussian HMC sampler.
+  Gaussian HMC sampler (`covariance` and `rng` are keyword-only).
 - Type stubs and a `py.typed` marker.
 - `tmgen.__version__`.
 - `lognormal_tm` is exported from `tmgen.models`.
