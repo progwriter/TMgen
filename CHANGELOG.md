@@ -12,6 +12,10 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Added
 
+- `tmgen.hmc` and `tmgen.TMgenException` are available from the top-level
+  package, and `tmgen.plot` can be used as `tmgen.plot` without importing it
+  first (matplotlib is only imported when it is used). `tmgen.__all__` lists
+  only names that exist; `tmgen.tm` is no longer listed (use `TrafficMatrix`).
 - `TrafficMatrix.modulate(profile)` scales a single-epoch matrix by one
   multiplier per epoch, so any spatial model can be combined with any temporal
   pattern.
