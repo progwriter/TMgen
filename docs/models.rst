@@ -261,6 +261,30 @@ classes is exactly its fraction of the total:
 Pass a ``(num_classes, num_classes, num_epochs)`` array to change the fractions
 over time.
 
+Data centres: hot nodes and racks
+---------------------------------
+
+:py:func:`~tmgen.models.datacenter_tm` follows the node distributions of
+TrafPy [#trafpy]_. A fraction of the nodes is *hot* and carries a larger part of
+the traffic, and nodes sit in racks with a set share of the traffic crossing
+racks. The defaults are TrafPy's university data centre, where 20% of the nodes
+request 55% of the traffic. Of all matrices with these properties it returns
+the one of maximum entropy:
+
+>>> from tmgen.models import datacenter_tm
+>>> tm = datacenter_tm(
+...     num_nodes=16, total_traffic=100.0, num_racks=4, inter_rack_fraction=0.7, rng=1
+... )
+>>> round(float(tm.matrix.sum()), 6)
+100.0
+>>> float(tm.matrix[:, :, 0].diagonal().sum())  # no self-traffic
+0.0
+
+The matrix has one epoch; use :py:meth:`~tmgen.TrafficMatrix.modulate` to
+follow a daily cycle. The properties cannot always hold together (a node cannot
+send more than half of the traffic, as it cannot send to itself), and then the
+function raises a :py:class:`~tmgen.TMgenException`.
+
 Large flows, spikes and noise
 -----------------------------
 
@@ -293,3 +317,7 @@ References
 .. [#roughan2005] Matthew Roughan. *Simplifying the Synthesis of Internet
    Traffic Matrices*. ACM SIGCOMM Computer Communication Review, October 2005.
    http://ccr.sigcomm.org/archive/2005/october/p93-roughan.pdf
+
+.. [#trafpy] Christopher W. F. Parsonson, Joshua L. Benjamin and Georgios
+   Zervas. *Traffic generation for benchmarking data centre networks*. Optical
+   Switching and Networking 46, 2022. https://arxiv.org/abs/2107.01398

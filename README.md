@@ -38,6 +38,7 @@ tm.zero_diagonal().save("day.npz")
 | Modulated gravity | `modulated_gravity_tm` | Random gravity scaled over time by a daily cycle, with optional noise |
 | Non-stationary conditionally independent | `ncim_tm` | Each epoch drawn independently around known totals, optionally per node and time zone |
 | Traffic classes | `traffic_class_tm` | Gravity inside groups of nodes (such as access and peering), with set traffic between groups |
+| Data centre | `datacenter_tm` | Hot nodes and racks with a set share of cross-rack traffic |
 | Spike | `spike_tm` | A few large, randomly placed flows |
 | Uniform, exponential, lognormal | `uniform_tm`, `exp_tm`, `lognormal_tm` | Independent random entries |
 | Exact | `exact_tm` | Every entry the same, for tests |

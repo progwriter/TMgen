@@ -8,6 +8,7 @@ import pytest
 from tmgen.exceptions import TMgenException
 from tmgen.models import (
     _truncated_normal,
+    datacenter_tm,
     diurnal_profile,
     exact_tm,
     exp_tm,
@@ -687,3 +688,67 @@ def test_traffic_class_validates_the_fractions(fractions: Any) -> None:
 def test_traffic_class_validates_the_totals() -> None:
     with pytest.raises(TMgenException):
         traffic_class_tm([-1.0], [0, 1], numpy.full((2, 2), 0.25))
+
+
+def test_datacenter_hot_nodes_carry_the_hot_load() -> None:
+    tm = datacenter_tm(20, 100.0, hot_nodes=[0, 1, 2, 3], hot_load_fraction=0.55)
+    m = tm.matrix[:, :, 0]
+    assert m.sum() == pytest.approx(100.0)
+    assert (numpy.diag(m) == 0).all()
+    numpy.testing.assert_allclose(m.sum(axis=1)[:4], 55.0 / 4)
+    numpy.testing.assert_allclose(m.sum(axis=0)[:4], 55.0 / 4)
+    numpy.testing.assert_allclose(m.sum(axis=1)[4:], 45.0 / 16)
+
+
+def test_datacenter_picks_the_default_fraction_of_hot_nodes() -> None:
+    m = datacenter_tm(20, 1.0, rng=3).matrix[:, :, 0]
+    assert (m.sum(axis=1) > 0.1).sum() == 4
+
+
+def test_datacenter_racks_set_the_inter_rack_share() -> None:
+    tm = datacenter_tm(20, 100.0, num_racks=4, inter_rack_fraction=0.7, rng=1)
+    m = tm.matrix[:, :, 0]
+    racks = numpy.arange(20) * 4 // 20
+    assert m[racks[:, None] != racks[None, :]].sum() == pytest.approx(70.0)
+    assert m.sum() == pytest.approx(100.0)
+
+
+def test_datacenter_without_skew_is_uniform_off_the_diagonal() -> None:
+    m = datacenter_tm(5, 20.0, hot_nodes=[0, 1, 2, 3, 4], hot_load_fraction=1).matrix
+    off = ~numpy.eye(5, dtype=bool)
+    numpy.testing.assert_allclose(m[:, :, 0][off], 1.0)
+
+
+def test_datacenter_is_reproducible() -> None:
+    a = datacenter_tm(10, 1.0, rng=5)
+    assert a == datacenter_tm(10, 1.0, rng=5)
+    assert a != datacenter_tm(10, 1.0, rng=6)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"num_nodes": 1},
+        {"hot_load_fraction": 1.5},
+        {"hot_load_fraction": 0.9, "hot_node_fraction": 0.05},
+        {"hot_node_fraction": 2},
+        {"hot_nodes": []},
+        {"hot_nodes": [10]},
+        {"hot_nodes": list(range(10)), "hot_load_fraction": 0.5},
+        {"num_racks": 2},
+        {"inter_rack_fraction": 0.5},
+        {"num_racks": 11, "inter_rack_fraction": 0.5},
+        {"num_racks": 2, "inter_rack_fraction": 1.5},
+        {"num_racks": 10, "inter_rack_fraction": 0.5},
+        {
+            "num_racks": 2,
+            "inter_rack_fraction": 0.99,
+            "hot_nodes": [0],
+            "hot_load_fraction": 0.45,
+        },
+    ],
+)
+def test_datacenter_validates(kwargs: dict[str, Any]) -> None:
+    args: dict[str, Any] = {"num_nodes": 10, "total_traffic": 1.0, **kwargs}
+    with pytest.raises(TMgenException):
+        datacenter_tm(**args)

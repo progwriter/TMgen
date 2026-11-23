@@ -427,6 +427,129 @@ def traffic_class_tm(
     return TrafficMatrix._from_owned(matrix)
 
 
+def datacenter_tm(
+    num_nodes: int,
+    total_traffic: float,
+    *,
+    hot_node_fraction: float = 0.2,
+    hot_load_fraction: float = 0.55,
+    hot_nodes: Sequence[int] | None = None,
+    num_racks: int = 1,
+    inter_rack_fraction: float | None = None,
+    rng: RngLike = None,
+) -> TrafficMatrix:
+    """
+    A data centre traffic matrix with hot nodes and racks, following the
+    node distributions of TrafPy (Parsonson, Benjamin and Zervas, *Traffic
+    generation for benchmarking data centre networks*, Optical Switching and
+    Networking, 2022).
+
+    A fraction of the nodes is *hot*: together they send (and receive)
+    *hot_load_fraction* of the traffic, split evenly among them, and the other
+    nodes split the rest. Nodes can also sit in racks, and *inter_rack_fraction*
+    sets the share of the traffic that crosses racks. Of all matrices with
+    these properties the result is the one of maximum entropy (found by
+    iterative proportional fitting), so no pair is favored beyond what you
+    asked for.
+
+    There is no traffic from a node to itself (as in TrafPy), and the matrix
+    is deterministic given the hot nodes; *rng* only chooses them. It has one
+    epoch: use :py:meth:`~tmgen.tm.TrafficMatrix.modulate` for a time series.
+
+    :param num_nodes: number of nodes (servers), at least 2
+    :param total_traffic: the total traffic of the matrix
+    :param hot_node_fraction: fraction of the nodes that are hot, between 0
+        and 1; at least one node is hot. The default 0.2 with *hot_load_fraction*
+        0.55 is TrafPy's university data centre. Ignored with *hot_nodes*
+    :param hot_load_fraction: share of the ingress and of the egress traffic
+        of the hot nodes together, between 0 and 1. Each node must send less
+        than half of the traffic, as it cannot send to itself
+    :param hot_nodes: the indices of the hot nodes instead of random ones
+    :param num_racks: number of racks. Nodes are assigned to racks in order,
+        as evenly as possible
+    :param inter_rack_fraction: share of the traffic between nodes of
+        different racks, between 0 and 1. Required with more than one rack
+    :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
+    :return: a new :py:class:`~TrafficMatrix`
+    :raises TMgenException: if the requested properties cannot hold together
+    """
+    num_nodes = _count(num_nodes, "num_nodes")
+    if num_nodes < 2:
+        raise TMgenException("num_nodes must be at least 2")
+    total_traffic = _number(total_traffic, "total_traffic")
+    hot_load_fraction = _number(hot_load_fraction, "hot_load_fraction")
+    if hot_load_fraction > 1:
+        raise TMgenException("hot_load_fraction must be at most 1")
+    num_racks = _count(num_racks, "num_racks")
+    if num_racks > num_nodes:
+        raise TMgenException("num_racks must not exceed num_nodes")
+    if (inter_rack_fraction is None) != (num_racks == 1):
+        raise TMgenException(
+            "inter_rack_fraction is required with, and only with, more than one rack"
+        )
+    gen = _resolve_rng(rng)
+
+    if hot_nodes is None:
+        hot_node_fraction = _number(hot_node_fraction, "hot_node_fraction")
+        if hot_node_fraction > 1:
+            raise TMgenException("hot_node_fraction must be at most 1")
+        count = max(1, round(hot_node_fraction * num_nodes))
+        hot = numpy.asarray(gen.permutation(num_nodes)[:count])
+    else:
+        hot = numpy.unique(numpy.asarray(hot_nodes, dtype=int))
+        if hot.size == 0 or hot.min() < 0 or hot.max() >= num_nodes:
+            raise TMgenException(
+                f"hot_nodes must be non-empty node indices below {num_nodes}"
+            )
+    if hot.size == num_nodes and hot_load_fraction != 1:
+        raise TMgenException("hot_load_fraction must be 1 when every node is hot")
+    share = numpy.full(num_nodes, 0.0)
+    cold = num_nodes - hot.size
+    share[hot] = hot_load_fraction / hot.size
+    if cold:
+        share[numpy.setdiff1d(numpy.arange(num_nodes), hot)] = (
+            1 - hot_load_fraction
+        ) / cold
+    if (2 * share > 1 + 1e-12).any():
+        raise TMgenException(
+            "A node cannot send more than half of the traffic; lower "
+            "hot_load_fraction or hot more nodes"
+        )
+
+    off_diagonal = ~numpy.eye(num_nodes, dtype=bool)
+    mass = off_diagonal.astype(numpy.float64)
+    racks = numpy.arange(num_nodes) * num_racks // num_nodes
+    crossing = racks[:, None] != racks[None, :]
+    within = off_diagonal & ~crossing
+    inter = 0.0
+    if inter_rack_fraction is not None:
+        inter = _number(inter_rack_fraction, "inter_rack_fraction")
+        if inter > 1:
+            raise TMgenException("inter_rack_fraction must be at most 1")
+        if not within.any() and inter < 1:
+            raise TMgenException("racks of one node have no traffic inside them")
+    for _ in range(20000):
+        mass *= (share / mass.sum(axis=1))[:, None]
+        mass *= (share / mass.sum(axis=0))[None, :]
+        if num_racks > 1:
+            crossing_mass = mass[crossing].sum()
+            mass[crossing] *= inter / crossing_mass if crossing_mass else 1.0
+            mass[within] *= (1 - inter) / mass[within].sum() if inter < 1 else 0.0
+        error = max(
+            numpy.abs(mass.sum(axis=1) - share).max(),
+            numpy.abs(mass.sum(axis=0) - share).max(),
+            abs(mass[crossing].sum() - inter) if num_racks > 1 else 0.0,
+        )
+        if error < 1e-12:
+            break
+    else:
+        raise TMgenException(
+            "The requested hot nodes, racks and inter-rack fraction cannot hold "
+            "together; relax one of them"
+        )
+    return TrafficMatrix._from_owned((mass * total_traffic)[:, :, None])
+
+
 @renamed_arguments(
     num_tms="num_epochs",
     mean_traffic="total_traffic",
