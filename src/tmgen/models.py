@@ -12,6 +12,31 @@ working); an ``int`` seeds a fresh generator; a ``Generator`` is used as is.
 """
 
 
+def _count(value: float, name: str) -> int:
+    """A positive whole number, such as a number of nodes or epochs."""
+    try:
+        count = int(value)
+    except (TypeError, ValueError, OverflowError):
+        raise TMgenException(
+            f"{name} must be a positive integer, got {value!r}"
+        ) from None
+    if count != value or count < 1:
+        raise TMgenException(f"{name} must be a positive integer, got {value!r}")
+    return count
+
+
+def _number(value: float, name: str, *, minimum: float | None = 0) -> float:
+    """A finite number, at least *minimum* (any if None)."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise TMgenException(f"{name} must be a number, got {value!r}") from None
+    if not numpy.isfinite(number) or (minimum is not None and number < minimum):
+        bound = "" if minimum is None else f" and at least {minimum:g}"
+        raise TMgenException(f"{name} must be finite{bound}, got {value!r}")
+    return number
+
+
 def _resolve_rng(
     rng: RngLike,
 ) -> numpy.random.Generator | numpy.random.RandomState:
@@ -155,8 +180,14 @@ def modulated_gravity_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: a new :py:class:`~TrafficMatrix`
     """
-    if spatial_variance < 0 or temporal_variance < 0:
-        raise TMgenException("Variances must be non-negative")
+    num_nodes = _count(num_nodes, "num_nodes")
+    num_tms = _count(num_tms, "num_tms")
+    mean_traffic = _number(mean_traffic, "mean_traffic")
+    if mean_traffic == 0:
+        raise TMgenException("mean_traffic must be positive")
+    diurnal_freq = _number(diurnal_freq, "diurnal_freq", minimum=None)
+    spatial_variance = _number(spatial_variance, "spatial_variance")
+    temporal_variance = _number(temporal_variance, "temporal_variance")
     gen = _resolve_rng(rng)
 
     total = _peak_mean_cycle(diurnal_freq, num_tms, mean_traffic, pm_ratio, t_ratio)
@@ -204,6 +235,8 @@ def random_gravity_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: a new :py:class:`~TrafficMatrix`
     """
+    num_nodes = _count(num_nodes, "num_nodes")
+    mean_traffic = _number(mean_traffic, "mean_traffic")
     weights = _resolve_rng(rng).exponential(1.0, size=num_nodes)
     scale = weights.sum() ** 2 if normalize else num_nodes**2
     matrix = numpy.outer(weights, weights) * (mean_traffic / scale)
@@ -224,10 +257,17 @@ def gravity_tm(populations: ArrayLike, total_traffic: float) -> TrafficMatrix:
         (will be divided among all ingres-egress pairs)
     :return: a new :py:class:`~TrafficMatrix`
     """
-    if not isinstance(populations, numpy.ndarray):
-        populations = numpy.array(populations)
-    if populations.ndim != 1:
-        raise TMgenException("Expected populations to be 1-d numpy array")
+    total_traffic = _number(total_traffic, "total_traffic")
+    try:
+        populations = numpy.asarray(populations, dtype=numpy.float64)
+    except (TypeError, ValueError):
+        raise TMgenException("populations must be numeric") from None
+    if populations.ndim != 1 or populations.size == 0:
+        raise TMgenException("Expected populations to be a non-empty 1-d array")
+    if not numpy.isfinite(populations).all() or (populations < 0).any():
+        raise TMgenException("populations must be finite and non-negative")
+    if populations.sum() == 0:
+        raise TMgenException("populations must not all be zero")
     num_nodes = populations.size
     denom = populations.sum() ** 2
     res = numpy.outer(populations, populations) / denom * total_traffic
@@ -253,12 +293,12 @@ def uniform_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
     """
-    if num_nodes < 0 or low < 0 or high < 0:
-        raise TMgenException("All values must be greater than 0")
-    if low >= high:
-        # Swap the values
-        low, high = high, low
-    # Get random tm
+    num_nodes = _count(num_nodes, "num_nodes")
+    num_epochs = _count(num_epochs, "num_epochs")
+    low = _number(low, "low")
+    high = _number(high, "high")
+    if low > high:
+        raise TMgenException(f"low ({low:g}) must not exceed high ({high:g})")
     r = _resolve_rng(rng).random((num_nodes, num_nodes, num_epochs))
     return TrafficMatrix(
         numpy.reshape(low + (high - low) * r, (num_nodes, num_nodes, num_epochs)).clip(
@@ -280,6 +320,9 @@ def exp_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
     """
+    num_nodes = _count(num_nodes, "num_nodes")
+    num_epochs = _count(num_epochs, "num_epochs")
+    mean_traffic = _number(mean_traffic, "mean_traffic")
     return TrafficMatrix(
         _resolve_rng(rng)
         .exponential(mean_traffic, size=(num_nodes, num_nodes, num_epochs))
@@ -312,12 +355,17 @@ def spike_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
     """
+    num_nodes = _count(num_nodes, "num_nodes")
+    num_epochs = _count(num_epochs, "num_epochs")
+    mean_spike = _number(mean_spike, "mean_spike")
     size = num_nodes * num_nodes * num_epochs
-    if not 0 <= num_spikes <= size:
+    if num_spikes != int(num_spikes) or not 0 <= num_spikes <= size:
         raise TMgenException(
-            "Number of spikes must be between 0 and the number of entries "
-            "(num_nodes * num_nodes * num_epochs)"
+            "num_spikes must be a whole number between 0 and the number of "
+            f"entries (num_nodes * num_nodes * num_epochs = {size}), "
+            f"got {num_spikes!r}"
         )
+    num_spikes = int(num_spikes)
     gen = _resolve_rng(rng)
     tm = numpy.zeros(size)
     support = gen.choice(size, size=num_spikes, replace=False)
@@ -344,6 +392,10 @@ def lognormal_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
     """
+    num_nodes = _count(num_nodes, "num_nodes")
+    num_epochs = _count(num_epochs, "num_epochs")
+    mean_traffic = _number(mean_traffic, "mean_traffic", minimum=None)
+    sigma = _number(sigma, "sigma")
     return TrafficMatrix(
         _resolve_rng(rng)
         .lognormal(
@@ -364,6 +416,9 @@ def exact_tm(num_nodes: int, val: float, num_epochs: int = 1) -> TrafficMatrix:
     :param num_epochs: number of epochs
     :return: a new TrafficMatrix object
     """
+    num_nodes = _count(num_nodes, "num_nodes")
+    num_epochs = _count(num_epochs, "num_epochs")
+    val = _number(val, "val")
     return TrafficMatrix(numpy.ones((num_nodes, num_nodes, num_epochs)) * val)
 
 

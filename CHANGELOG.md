@@ -23,6 +23,12 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- All models validate their arguments and raise `TMgenException` (a
+  `ValueError`) with a message naming the argument: sizes and epoch counts must
+  be positive whole numbers, volumes finite and non-negative, `sigma` and the
+  variances non-negative, and populations non-negative with a positive sum.
+  `uniform_tm` raises when `low > high` instead of silently swapping the
+  bounds.
 - `TMgenException` is now a subclass of `ValueError`. `hmc_sample` raises it
   (instead of a bare `ValueError`) and checks the shapes of its arguments and
   that `num_samples` is at least 1; `num_samples=1` returns the initial point.
