@@ -36,6 +36,9 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- The package no longer ships `.pxd` files (`hmc.pxd`, and an `__init__.pxd`
+  that cimported a module that no longer exists), so `cimport tmgen...` is not
+  supported and downstream Cython code does not need NumPy at build time.
 - `tmgen.plot.heatmap` and `timeseries` accept a keyword-only `ax` (matplotlib
   axes, default the current axes) and return the axes they drew on, so they
   can be used in subplots. The single-epoch heatmap labels its axes "Ingress

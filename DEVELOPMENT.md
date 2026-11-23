@@ -37,8 +37,7 @@ built. CI runs the same hooks.
 
 - `src/tmgen/tm.py`, `models.py`, `plot.py`, `inject/`: plain Python (NumPy).
 - `src/tmgen/hmc.pyx`: the only compiled module. Ruff and mypy cannot see
-  `.pyx` files, so when you change its signature, update `hmc.pyi` (and
-  `hmc.pxd`) by hand.
+  `.pyx` files, so when you change its signature, update `hmc.pyi` by hand.
 - `tests/`, `docs/`, `tools/` (release helpers).
 
 ## Checks

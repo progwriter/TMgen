@@ -5,7 +5,7 @@ TMgen generates network traffic matrices. Python 3.11+, with one Cython extensio
 ## Layout
 
 - `src/tmgen/tm.py`, `models.py`, `plot.py`, `inject/`: pure Python (NumPy).
-- `src/tmgen/hmc.pyx`: the only compiled module; `hmc.pyi` (typed API) and `hmc.pxd` are hand-written.
+- `src/tmgen/hmc.pyx`: the only compiled module; `hmc.pyi` (typed API) is hand-written. No `.pxd` files are shipped: the compiled module is not a cimport API.
 - `tests/`, `docs/` (Sphinx; `docs/quickstart.rst` doctests run under pytest), `tools/` (release helpers, type-checked and tested).
 - `agentdocs/` (git-ignored): local notes such as `PLAN.md` and `API_CRITIQUE.md`. Never commit them. Keep `agentdocs/PLAN.md` current as work lands.
 
@@ -30,7 +30,7 @@ pytest            # tests + docs doctests, each in a temp dir (conftest.py)
 Gotchas:
 
 - Ruff's import sorting depends on whether the extension is built, so run `ruff check` after building.
-- Ruff and mypy do not see `.pyx` files. When `hmc.pyx`'s signature changes, update `hmc.pyi` (and `hmc.pxd`) by hand.
+- Ruff and mypy do not see `.pyx` files. When `hmc.pyx`'s signature changes, update `hmc.pyi` by hand.
 
 ## Code style
 
