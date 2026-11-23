@@ -424,3 +424,30 @@ def test_modulated_gravity_default_cycle_stays_around_the_total() -> None:
     totals = tm.matrix.sum(axis=(0, 1))
     assert totals.min() == pytest.approx(50.0, rel=1e-2)
     assert totals.max() == pytest.approx(150.0, rel=1e-2)
+
+
+def test_modulated_gravity_is_asymmetric_by_default() -> None:
+    m = modulated_gravity_tm(6, 4, 100.0, rng=0).matrix[:, :, 0]
+    assert not numpy.allclose(m, m.T)
+    assert numpy.linalg.matrix_rank(m) == 1
+
+
+def test_modulated_gravity_symmetric_option() -> None:
+    tm = modulated_gravity_tm(6, 4, 100.0, symmetric=True, rng=0)
+    for epoch in range(4):
+        numpy.testing.assert_allclose(tm.at_time(epoch), tm.at_time(epoch).T)
+
+
+@pytest.mark.parametrize("symmetric", [False, True])
+def test_modulated_gravity_totals_do_not_depend_on_symmetry(symmetric: bool) -> None:
+    tm = modulated_gravity_tm(7, 48, 100.0, symmetric=symmetric, rng=1)
+    expected = diurnal_profile(48, 100.0)
+    numpy.testing.assert_allclose(tm.matrix.sum(axis=(0, 1)), expected)
+
+
+def test_modulated_gravity_spatial_variance_applies_to_ingress_and_egress() -> None:
+    kwargs: dict[str, Any] = dict(total_traffic=1000.0, temporal_variance=0)
+    tm = modulated_gravity_tm(5, 3, spatial_variance=2500, rng=3, **kwargs)
+    ingress = tm.at_time(0).sum(axis=1)
+    egress = tm.at_time(0).sum(axis=0)
+    assert not numpy.allclose(ingress, egress)

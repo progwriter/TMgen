@@ -38,6 +38,10 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- `modulated_gravity_tm` draws independent ingress and egress shares by default
+  (as the paper's model does, and as `random_gravity_tm` now does), so its
+  matrices are no longer symmetric and seeded output changes. Pass
+  `symmetric=True` to share the shares between rows and columns.
 - `modulated_gravity_tm` takes `peak_to_mean` and `trough_to_mean` (were
   `pm_ratio` and `t_ratio`; the old keywords still work with a
   `DeprecationWarning`). `trough_to_mean` now defaults to `None`, a symmetric

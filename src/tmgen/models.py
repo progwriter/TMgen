@@ -165,6 +165,7 @@ def modulated_gravity_tm(
     spatial_variance: float = 0,
     temporal_variance: float = 0,
     *,
+    symmetric: bool = False,
     rng: RngLike = None,
 ) -> TrafficMatrix:
     """
@@ -172,12 +173,12 @@ def modulated_gravity_tm(
 
     The total traffic follows a daily cycle (see :py:func:`diurnal_profile`)
     around *total_traffic*.
-    Each epoch is :math:`X(t) = T\\, u\\, u^T p(t)`, where :math:`T` is the mean
-    total, :math:`u` holds each node's share of the traffic and :math:`p(t)`
-    the relative volume at time :math:`t`. Both are drawn from normal
-    distributions truncated at zero, centered on a random split of the
-    traffic and on the cycle. With non-zero variances the total of an epoch
-    matches the cycle only in expectation.
+    Each epoch is :math:`X(t) = T\\, u\\, v^T p(t)`, where :math:`T` is the mean
+    total, :math:`u` and :math:`v` hold each node's share of the ingress and
+    egress traffic and :math:`p(t)` the relative volume at time :math:`t`. They
+    are drawn from normal distributions truncated at zero, centered on a random
+    split of the traffic and on the cycle. With non-zero variances the total of
+    an epoch matches the cycle only in expectation.
 
     :param num_nodes: number of nodes in the network
     :param num_epochs: number of time epochs (matrices) to generate
@@ -197,6 +198,8 @@ def modulated_gravity_tm(
         ``total_traffic / num_nodes`` inflate the total
     :param temporal_variance: Variance of the total traffic around the cycle,
         in squared traffic units. The default, 0, follows the cycle exactly
+    :param symmetric: use the same shares for ingress and egress, which makes
+        every matrix symmetric. By default they are drawn independently
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: a new :py:class:`~TrafficMatrix`
     """
@@ -215,13 +218,17 @@ def modulated_gravity_tm(
     )
     mean_total = float(numpy.mean(total))
 
-    shares = gen.random(num_nodes)
-    shares /= shares.sum()
-    node = _truncated_normal(gen, shares, numpy.sqrt(spatial_variance) / mean_total)
+    def node_shares() -> NDArray[numpy.float64]:
+        shares = gen.random(num_nodes)
+        shares /= shares.sum()
+        return _truncated_normal(gen, shares, numpy.sqrt(spatial_variance) / mean_total)
+
+    ingress = node_shares()
+    egress = ingress if symmetric else node_shares()
     modulation = _truncated_normal(
         gen, total / mean_total, numpy.sqrt(temporal_variance) / mean_total
     )
-    gravity = mean_total * numpy.outer(node, node)
+    gravity = mean_total * numpy.outer(ingress, egress)
     return TrafficMatrix._from_owned(gravity[:, :, None] * modulation)
 
 
