@@ -23,6 +23,9 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- `gravity_tm`, `spike_tm` and `modulated_gravity_tm` are vectorized
+  (`gravity_tm` is hundreds of times faster for large networks); results are
+  unchanged.
 - `TrafficMatrix` and the traffic models are now pure Python/NumPy instead
   of Cython, with identical results for a given NumPy seed. Only the HMC
   sampler is still compiled. `TrafficMatrix` now raises `TypeError` for

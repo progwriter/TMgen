@@ -5,6 +5,7 @@ import pytest
 
 from tmgen.models import (
     exp_tm,
+    gravity_tm,
     lognormal_tm,
     modulated_gravity_tm,
     random_gravity_tm,
@@ -83,3 +84,22 @@ def test_default_uses_global_seed(name: str) -> None:
 def test_rng_is_keyword_only(name: str) -> None:
     with pytest.raises(TypeError):
         random_gravity_tm(3, 1.0, 7)  # type: ignore[call-arg]
+
+
+def test_spike_has_exactly_num_spikes_per_epoch() -> None:
+    tm = spike_tm(5, 4, 2.0, num_epochs=6, rng=0)
+    assert ((tm.matrix > 0).sum(axis=(0, 1)) == 4).all()
+
+
+def test_gravity_matches_definition() -> None:
+    pop = numpy.array([1.0, 2.0, 3.0])
+    tm = gravity_tm(pop, 12.0)
+    assert tm.matrix.shape == (3, 3, 1)
+    numpy.testing.assert_allclose(tm.matrix[:, :, 0], numpy.outer(pop, pop) / 36 * 12)
+    assert tm.matrix.sum() == pytest.approx(12.0)
+
+
+def test_modulated_gravity_scales_base_by_sinusoid() -> None:
+    tm = modulated_gravity_tm(3, 5, 10.0, rng=1)
+    ratio = tm.matrix / tm.matrix[:, :, :1]
+    numpy.testing.assert_allclose(ratio, numpy.broadcast_to(ratio[0, 0], ratio.shape))

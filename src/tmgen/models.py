@@ -114,10 +114,7 @@ def modulated_gravity_tm(
     base_random_gravity_tm = random_gravity_tm(
         num_nodes, mean_traffic / num_nodes, rng=rng
     )
-    tm = numpy.concatenate(
-        [base_random_gravity_tm.matrix * x for x in sinusoid], axis=2
-    )
-    return TrafficMatrix(tm)
+    return TrafficMatrix(base_random_gravity_tm.matrix * sinusoid)
 
 
 def random_gravity_tm(
@@ -160,14 +157,9 @@ def gravity_tm(populations: ArrayLike, total_traffic: float) -> TrafficMatrix:
     if populations.ndim != 1:
         raise TMgenException("Expected populations to be 1-d numpy array")
     num_nodes = populations.size
-    res = numpy.zeros((num_nodes, num_nodes))
     denom = populations.sum() ** 2
-    for i in range(num_nodes):
-        for j in range(num_nodes):
-            res[i, j] = (populations[i] * populations[j] / denom) * total_traffic
-    # Conform to the 3d shape
-    res = numpy.reshape(res, (num_nodes, num_nodes, 1))
-    return TrafficMatrix(res)
+    res = numpy.outer(populations, populations) / denom * total_traffic
+    return TrafficMatrix(res.reshape((num_nodes, num_nodes, 1)))
 
 
 def uniform_tm(
@@ -251,18 +243,16 @@ def spike_tm(
         min=0
     )
 
-    # This generates a "mask" for which values to zero out. We need all values
-    # except num_spikes to be 0s. So we generete an 1-d array of num_spikes ones
-    # and all other zeros.
-    # We continue to shuffle it, and reshape it into a 2-d array of n x n nodes
-    # to use it as a boolean index into the traffic matrix and set values to 0.
-    mask = numpy.concatenate(
-        (numpy.ones(num_spikes), numpy.zeros(num_nodes * num_nodes - num_spikes))
-    )
+    # Each epoch keeps `num_spikes` entries. The mask is shuffled in place
+    # epoch after epoch (rather than drawn independently) to keep the random
+    # stream, and hence seeded output, identical to earlier releases.
+    mask = numpy.zeros(num_nodes * num_nodes, dtype=bool)
+    mask[:num_spikes] = True
+    keep = numpy.empty((num_epochs, num_nodes * num_nodes), dtype=bool)
     for e in range(num_epochs):
         gen.shuffle(mask)
-        reshaped_mask = mask.reshape((num_nodes, num_nodes))
-        tm[:, :, e][reshaped_mask == 0] = 0
+        keep[e] = mask
+    tm[~keep.T.reshape((num_nodes, num_nodes, num_epochs))] = 0
 
     return TrafficMatrix(tm)
 
