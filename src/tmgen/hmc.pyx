@@ -7,6 +7,8 @@ from cpython cimport bool
 from libc.math cimport acos, atan2, cos, fabs, sin, sqrt, INFINITY, M_PI, isfinite
 from numpy.linalg import cholesky
 
+from tmgen.exceptions import TMgenException
+
 # The Gram matrix G = F F^T costs m*m doubles. Above this size the kernel
 # falls back to recomputing F @ a and F @ b after every reflection.
 MAX_GRAM_BYTES = 268435456
@@ -170,10 +172,20 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
     :return:
         a :math:`d \times num_samples` matrix where each column is a sample
     """
+    if num_samples < 1:
+        raise TMgenException('num_samples must be at least 1')
+    if f.ndim != 2:
+        raise TMgenException('f must be a matrix')
     if g.ndim != 1:
-        raise ValueError('g must be a vector')
+        raise TMgenException('g must be a vector')
     if f.shape[0] != g.size:
-        raise ValueError('First dimension of f and g must match')
+        raise TMgenException('First dimension of f and g must match')
+    cdef Py_ssize_t dim = f.shape[1]
+    if (numpy.shape(m) != (dim, dim) or numpy.shape(mu_r) != (dim,)
+            or numpy.shape(initial_x) != (dim,)):
+        raise TMgenException(
+            'm must be d x d, and mu_r and initial_x must have length d, '
+            'where d is the second dimension of f')
 
     # work on copies, the caller's arrays must not be modified
     g = g.copy()
@@ -199,7 +211,7 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
     # Verify that initial_x is feasible
     cdef numpy.ndarray c = numpy.matmul(f, initial_x) + g
     if numpy.any(c < 0):
-        raise ValueError('Error: Initial condition violates the constraints')
+        raise TMgenException('Initial condition violates the constraints')
 
     if rng is None:
         # the global state keeps numpy.random.seed working

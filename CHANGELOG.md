@@ -23,6 +23,9 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- `TMgenException` is now a subclass of `ValueError`. `hmc_sample` raises it
+  (instead of a bare `ValueError`) and checks the shapes of its arguments and
+  that `num_samples` is at least 1; `num_samples=1` returns the initial point.
 - `random_gravity_tm` draws its node weights from an exponential distribution
   (eq. 6 of the paper) instead of normalized uniforms, so matrices are more
   skewed. The total is now random, `mean_traffic * (1 + 1/num_nodes)` on

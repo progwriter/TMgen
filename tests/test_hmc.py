@@ -1,8 +1,11 @@
+from typing import Any
+
 import numpy
 import pytest
 from numpy.typing import NDArray
 
 from tmgen import hmc
+from tmgen.exceptions import TMgenException
 from tmgen.hmc import hmc_sample
 
 
@@ -80,3 +83,40 @@ def test_orthant_moments() -> None:
     )
     assert xs.mean(axis=1) == pytest.approx(numpy.sqrt(2 / numpy.pi), abs=0.03)
     assert xs.var(axis=1) == pytest.approx(1 - 2 / numpy.pi, abs=0.03)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"num_samples": 0},
+        {"g": numpy.zeros(3)},
+        {"g": numpy.zeros((2, 1))},
+        {"m": numpy.eye(3)},
+        {"mu_r": numpy.zeros(3)},
+        {"initial_x": numpy.ones(3)},
+        {"initial_x": -numpy.ones(2)},
+    ],
+)
+def test_invalid_arguments_raise_tmgen_exception(kwargs: dict[str, Any]) -> None:
+    args: dict[str, Any] = {
+        "f": numpy.eye(2),
+        "g": numpy.zeros(2),
+        "m": numpy.eye(2),
+        "mu_r": numpy.zeros(2),
+        "initial_x": numpy.ones(2),
+        "num_samples": 5,
+    }
+    args.update(kwargs)
+    with pytest.raises(TMgenException):
+        hmc_sample(**args)
+
+
+def test_tmgen_exception_is_a_value_error() -> None:
+    assert issubclass(TMgenException, ValueError)
+
+
+def test_single_sample_returns_the_initial_point() -> None:
+    xs = hmc_sample(
+        numpy.eye(2), numpy.zeros(2), numpy.eye(2), numpy.zeros(2), numpy.ones(2), 1
+    )
+    numpy.testing.assert_array_equal(xs, [[1.0], [1.0]])
