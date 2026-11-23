@@ -31,7 +31,7 @@ _RANDOM_MODELS: dict[str, Callable[..., TrafficMatrix]] = {
 
 
 def test_modulated_gravity() -> None:
-    tm = modulated_gravity_tm(num_nodes=2, num_tms=10, mean_traffic=1.0)
+    tm = modulated_gravity_tm(num_nodes=2, num_epochs=10, total_traffic=1.0)
 
     assert tm.matrix.ndim == 3
     assert tm.matrix.shape == (2, 2, 10)
@@ -41,7 +41,7 @@ def test_modulated_gravity() -> None:
 def test_modulated_gravity_many_epochs() -> None:
     # regression test for #9: float epoch count broke numpy.linspace
     tm = modulated_gravity_tm(
-        num_nodes=14, num_tms=24, mean_traffic=3750, pm_ratio=1.5, t_ratio=0.75
+        num_nodes=14, num_epochs=24, total_traffic=3750, pm_ratio=1.5, t_ratio=0.75
     )
     assert tm.matrix.shape == (14, 14, 24)
 
@@ -181,7 +181,7 @@ def test_truncated_normal_zero_std_returns_clipped_mean() -> None:
 
 def test_modulated_gravity_temporal_variance_adds_noise() -> None:
     kwargs: dict[str, Any] = dict(
-        num_nodes=4, num_tms=2000, mean_traffic=1000.0, pm_ratio=1.5, t_ratio=1.0
+        num_nodes=4, num_epochs=2000, total_traffic=1000.0, pm_ratio=1.5, t_ratio=1.0
     )
     quiet = modulated_gravity_tm(
         spatial_variance=0, temporal_variance=0, rng=0, **kwargs
@@ -197,7 +197,7 @@ def test_modulated_gravity_temporal_variance_adds_noise() -> None:
 
 def test_modulated_gravity_spatial_variance_changes_shares() -> None:
     kwargs: dict[str, Any] = dict(
-        num_nodes=5, num_tms=4, mean_traffic=1000.0, temporal_variance=0
+        num_nodes=5, num_epochs=4, total_traffic=1000.0, temporal_variance=0
     )
     exact = modulated_gravity_tm(spatial_variance=0, rng=3, **kwargs)
     noisy = modulated_gravity_tm(spatial_variance=2500, rng=3, **kwargs)
@@ -314,3 +314,37 @@ def test_equal_bounds_and_integral_floats_are_accepted() -> None:
     assert exp_tm(3.0, 1.0, num_epochs=2.0).matrix.shape == (3, 3, 2)  # type: ignore[arg-type]
     assert exact_tm(2, 0.0).matrix.sum() == 0
     assert spike_tm(2, 4, 1.0).matrix.shape == (2, 2, 1)
+
+
+_RENAMES: list[tuple[Callable[..., TrafficMatrix], dict[str, Any], dict[str, Any]]] = [
+    (
+        lambda **kw: modulated_gravity_tm(3, rng=0, **kw),
+        {"num_tms": 4, "mean_traffic": 5.0},
+        {"num_epochs": 4, "total_traffic": 5.0},
+    ),
+    (
+        lambda **kw: random_gravity_tm(3, rng=0, **kw),
+        {"mean_traffic": 5.0},
+        {"total_traffic": 5.0},
+    ),
+    (
+        lambda **kw: exp_tm(3, rng=0, **kw),
+        {"mean_traffic": 5.0},
+        {"mean_entry": 5.0},
+    ),
+    (
+        lambda **kw: lognormal_tm(3, rng=0, **kw),
+        {"mean_traffic": 1.5},
+        {"mu": 1.5},
+    ),
+    (lambda **kw: exact_tm(3, **kw), {"val": 2.0}, {"value": 2.0}),
+]
+
+
+@pytest.mark.parametrize(("call", "old", "new"), _RENAMES)
+def test_old_parameter_names_still_work_but_warn(
+    call: Callable[..., TrafficMatrix], old: dict[str, Any], new: dict[str, Any]
+) -> None:
+    with pytest.warns(DeprecationWarning, match="is deprecated, use"):
+        from_old = call(**old)
+    numpy.testing.assert_array_equal(from_old.matrix, call(**new).matrix)

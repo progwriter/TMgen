@@ -1,6 +1,7 @@
 import numpy
 from numpy.typing import ArrayLike, NDArray
 
+from tmgen._compat import renamed_arguments
 from tmgen.exceptions import TMgenException
 from tmgen.tm import TrafficMatrix
 
@@ -138,10 +139,11 @@ def _peak_mean_cycle(
     return x
 
 
+@renamed_arguments(num_tms="num_epochs", mean_traffic="total_traffic")
 def modulated_gravity_tm(
     num_nodes: int,
-    num_tms: int,
-    mean_traffic: float,
+    num_epochs: int,
+    total_traffic: float,
     pm_ratio: float = 1.5,
     t_ratio: float = 0.75,
     diurnal_freq: float = 1 / 24,
@@ -153,7 +155,7 @@ def modulated_gravity_tm(
     """
     Generate a modulated gravity traffic matrix (Tune and Roughan, SIGCOMM 2015).
 
-    The total traffic follows a sinusoidal cycle with mean *mean_traffic*.
+    The total traffic follows a sinusoidal cycle with mean *total_traffic*.
     Each epoch is :math:`X(t) = T\\, u\\, u^T p(t)`, where :math:`T` is the mean
     total, :math:`u` holds each node's share of the traffic and :math:`p(t)`
     the relative volume at time :math:`t`. Both are drawn from normal
@@ -161,9 +163,10 @@ def modulated_gravity_tm(
     traffic and on the cycle. With non-zero variances the total of an epoch
     matches the cycle only in expectation.
 
-    :param num_nodes: number of Points-of-Presence (i.e., origin-destination pairs)
-    :param num_tms: total number of traffic matrices to generate (i.e., time epochs)
-    :param mean_traffic: the average total volume of traffic
+    :param num_nodes: number of nodes in the network
+    :param num_epochs: number of time epochs (matrices) to generate
+    :param total_traffic: the total volume of traffic in a matrix, averaged
+        over the epochs
     :param pm_ratio: peak-to-mean ratio. Peak traffic will be larger by
         this much (must be bigger than 1). Default is 1.5
     :param t_ratio: trough-to-mean ratio. Default is 0.75
@@ -171,26 +174,26 @@ def modulated_gravity_tm(
         if you are generating multi-day TMs
     :param spatial_variance: Variance of each node's traffic, in squared
         traffic units. Each share of the mean traffic then has a standard
-        deviation of ``sqrt(spatial_variance) / mean_traffic``. The default,
+        deviation of ``sqrt(spatial_variance) / total_traffic``. The default,
         0, gives deterministic shares. The effect depends on the scale of
-        *mean_traffic* and *num_nodes*: large values relative to
-        ``mean_traffic / num_nodes`` inflate the total
+        *total_traffic* and *num_nodes*: large values relative to
+        ``total_traffic / num_nodes`` inflate the total
     :param temporal_variance: Variance of the total traffic around the cycle,
         in squared traffic units. The default, 0, follows the cycle exactly
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: a new :py:class:`~TrafficMatrix`
     """
     num_nodes = _count(num_nodes, "num_nodes")
-    num_tms = _count(num_tms, "num_tms")
-    mean_traffic = _number(mean_traffic, "mean_traffic")
-    if mean_traffic == 0:
-        raise TMgenException("mean_traffic must be positive")
+    num_epochs = _count(num_epochs, "num_epochs")
+    total_traffic = _number(total_traffic, "total_traffic")
+    if total_traffic == 0:
+        raise TMgenException("total_traffic must be positive")
     diurnal_freq = _number(diurnal_freq, "diurnal_freq", minimum=None)
     spatial_variance = _number(spatial_variance, "spatial_variance")
     temporal_variance = _number(temporal_variance, "temporal_variance")
     gen = _resolve_rng(rng)
 
-    total = _peak_mean_cycle(diurnal_freq, num_tms, mean_traffic, pm_ratio, t_ratio)
+    total = _peak_mean_cycle(diurnal_freq, num_epochs, total_traffic, pm_ratio, t_ratio)
     if numpy.min(total) < 0:
         total = total + numpy.absolute(numpy.min(total))
     mean_total = float(numpy.mean(total))
@@ -207,9 +210,10 @@ def modulated_gravity_tm(
     return TrafficMatrix._from_owned(gravity[:, :, None] * modulation)
 
 
+@renamed_arguments(mean_traffic="total_traffic")
 def random_gravity_tm(
     num_nodes: int,
-    mean_traffic: float,
+    total_traffic: float,
     *,
     normalize: bool = False,
     symmetric: bool = False,
@@ -221,7 +225,7 @@ def random_gravity_tm(
     http://dl.acm.org/citation.cfm?id=1096551).
 
     The matrix is :math:`X = (T / N^2)\\, u v^T`, where :math:`T` is
-    *mean_traffic*, :math:`N` is *num_nodes*, and the ingress weights
+    *total_traffic*, :math:`N` is *num_nodes*, and the ingress weights
     :math:`u_i` and egress weights :math:`v_j` are drawn independently from an
     exponential distribution with mean 1. Its entries sum to :math:`T` on
     average, and to a random value in any one draw; use *normalize* for an
@@ -231,11 +235,11 @@ def random_gravity_tm(
     :py:meth:`TrafficMatrix.zero_diagonal` to remove it.
 
     :param num_nodes: number of nodes in the network
-    :param mean_traffic: the total traffic volume of the matrix, in
+    :param total_traffic: the total traffic volume of the matrix, in
         expectation (exactly with *normalize*). The average between a pair
         of nodes is this divided by ``num_nodes ** 2``
     :param normalize: scale the matrix so that its entries sum to exactly
-        *mean_traffic*
+        *total_traffic*
     :param symmetric: use the same weights for ingress and egress, which makes
         the matrix symmetric. Its entries then sum to
         :math:`T (1 + 1/N)` on average
@@ -243,12 +247,12 @@ def random_gravity_tm(
     :return: a new :py:class:`~TrafficMatrix`
     """
     num_nodes = _count(num_nodes, "num_nodes")
-    mean_traffic = _number(mean_traffic, "mean_traffic")
+    total_traffic = _number(total_traffic, "total_traffic")
     gen = _resolve_rng(rng)
     ingress = gen.exponential(1.0, size=num_nodes)
     egress = ingress if symmetric else gen.exponential(1.0, size=num_nodes)
     scale = ingress.sum() * egress.sum() if normalize else num_nodes**2
-    matrix = numpy.outer(ingress, egress) * (mean_traffic / scale)
+    matrix = numpy.outer(ingress, egress) * (total_traffic / scale)
     return TrafficMatrix._from_owned(matrix.reshape((num_nodes, num_nodes, 1)))
 
 
@@ -263,7 +267,7 @@ def gravity_tm(populations: ArrayLike, total_traffic: float) -> TrafficMatrix:
 
     :param populations: array/list with populations (weights) for each node
     :param total_traffic: total volume of traffic in the network
-        (will be divided among all ingres-egress pairs)
+        (divided among all ingress-egress pairs)
     :return: a new :py:class:`~TrafficMatrix`
     """
     total_traffic = _number(total_traffic, "total_traffic")
@@ -295,9 +299,9 @@ def uniform_tm(
     Return a uniform traffic matrix. Entries are chosen independently from each other,
     uniformly at random, between given values of low and high.
 
-    :param num_nodes: number of points-of-presence
-    :param low: lowest allowed value
-    :param high: highest allowed value
+    :param num_nodes: number of nodes in the network
+    :param low: lowest allowed volume of an entry
+    :param high: highest allowed volume of an entry
     :param num_epochs: number of epochs
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
@@ -316,25 +320,26 @@ def uniform_tm(
     )
 
 
+@renamed_arguments(mean_traffic="mean_entry")
 def exp_tm(
-    num_nodes: int, mean_traffic: float, num_epochs: int = 1, *, rng: RngLike = None
+    num_nodes: int, mean_entry: float, num_epochs: int = 1, *, rng: RngLike = None
 ) -> TrafficMatrix:
     """
     Exponential traffic matrix. Values are drawn from an exponential distribution,
-    with a mean value of *mean_traffic*.
+    with a mean value of *mean_entry*.
 
     :param num_nodes:  number of nodes in the network
-    :param mean_traffic: mean value of the distribution
+    :param mean_entry: mean volume of an entry
     :param num_epochs: number of epochs in the traffic matrix
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
     """
     num_nodes = _count(num_nodes, "num_nodes")
     num_epochs = _count(num_epochs, "num_epochs")
-    mean_traffic = _number(mean_traffic, "mean_traffic")
+    mean_entry = _number(mean_entry, "mean_entry")
     return TrafficMatrix._from_owned(
         _resolve_rng(rng)
-        .exponential(mean_traffic, size=(num_nodes, num_nodes, num_epochs))
+        .exponential(mean_entry, size=(num_nodes, num_nodes, num_epochs))
         .clip(min=0)
     )
 
@@ -382,9 +387,10 @@ def spike_tm(
     return TrafficMatrix._from_owned(tm.reshape((num_nodes, num_nodes, num_epochs)))
 
 
+@renamed_arguments(mean_traffic="mu")
 def lognormal_tm(
     num_nodes: int,
-    mean_traffic: float,
+    mu: float,
     sigma: float = 1,
     num_epochs: int = 1,
     *,
@@ -394,8 +400,8 @@ def lognormal_tm(
     Lognormal traffic matrix. Values are drawn from a lognormal distribution.
 
     :param num_nodes: number of nodes in the network
-    :param mean_traffic: mean (mu) of the underlying normal distribution,
-        *not* the mean of the resulting lognormal samples
+    :param mu: mean of the underlying normal distribution, *not* the mean of
+        the resulting lognormal samples (which is ``exp(mu + sigma**2 / 2)``)
     :param sigma: standard deviation of the underlying normal distribution
     :param num_epochs: number of epochs in the traffic matrix
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
@@ -403,33 +409,32 @@ def lognormal_tm(
     """
     num_nodes = _count(num_nodes, "num_nodes")
     num_epochs = _count(num_epochs, "num_epochs")
-    mean_traffic = _number(mean_traffic, "mean_traffic", minimum=None)
+    mu = _number(mu, "mu", minimum=None)
     sigma = _number(sigma, "sigma")
     return TrafficMatrix._from_owned(
         _resolve_rng(rng)
-        .lognormal(
-            mean=mean_traffic, sigma=sigma, size=(num_nodes, num_nodes, num_epochs)
-        )
+        .lognormal(mean=mu, sigma=sigma, size=(num_nodes, num_nodes, num_epochs))
         .clip(min=0)
     )
 
 
-def exact_tm(num_nodes: int, val: float, num_epochs: int = 1) -> TrafficMatrix:
+@renamed_arguments(val="value")
+def exact_tm(num_nodes: int, value: float, num_epochs: int = 1) -> TrafficMatrix:
     """
-    Create a traffic matrix where each value has exact value *val*.
+    Create a traffic matrix where each entry has exactly the volume *value*.
     Mostly used for unit tests when exact values are needed to check the solution,
     unlikely to be needed in practice.
 
     :param num_nodes: number of nodes in the network
-    :param val: the value to use for each entry
+    :param value: the volume of every entry
     :param num_epochs: number of epochs
     :return: a new TrafficMatrix object
     """
     num_nodes = _count(num_nodes, "num_nodes")
     num_epochs = _count(num_epochs, "num_epochs")
-    val = _number(val, "val")
+    value = _number(value, "value")
     return TrafficMatrix._from_owned(
-        numpy.ones((num_nodes, num_nodes, num_epochs)) * val
+        numpy.ones((num_nodes, num_nodes, num_epochs)) * value
     )
 
 

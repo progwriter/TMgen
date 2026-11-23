@@ -24,6 +24,14 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Changed
 
+- Parameters are named consistently: `num_epochs` everywhere (was `num_tms` in
+  `modulated_gravity_tm`); `total_traffic` for the total of a matrix
+  (`modulated_gravity_tm`, `random_gravity_tm`, `gravity_tm`); `mean_entry` for
+  the mean of an entry in `exp_tm`; `mu` in `lognormal_tm`, which was
+  documented as a mean but is the mean of the underlying normal (the mean of
+  the samples is `exp(mu + sigma**2 / 2)`); `value` in `exact_tm`. The old
+  keyword names still work and emit a `DeprecationWarning`; positional calls
+  are unaffected.
 - `TrafficMatrix` is immutable: the constructor accepts any array-like, converts
   it to float64 and copies it once, and `matrix` is a read-only property (so
   `tm.matrix = ...` and `tm.matrix[...] = ...` fail, and `at_time`, `between`
