@@ -104,17 +104,13 @@ def modulated_gravity_tm(
     :return:
     """
 
-    # generate total traffic
-    sinusoid = _peak_mean_cycle(diurnal_freq, num_tms, mean_traffic, pm_ratio, t_ratio)
-    if numpy.min(sinusoid) < 0:
-        # rescale
-        sinusoid = sinusoid + numpy.absolute(numpy.min(sinusoid))
-        mean_traffic = numpy.mean(sinusoid)
+    total = _peak_mean_cycle(diurnal_freq, num_tms, mean_traffic, pm_ratio, t_ratio)
+    if numpy.min(total) < 0:
+        total = total + numpy.absolute(numpy.min(total))
 
-    base_random_gravity_tm = random_gravity_tm(
-        num_nodes, mean_traffic / num_nodes, rng=rng
-    )
-    return TrafficMatrix(base_random_gravity_tm.matrix * sinusoid)
+    # the base matrix sums to 1, so each epoch's total is the modulated total
+    base = random_gravity_tm(num_nodes, 1.0, rng=rng)
+    return TrafficMatrix(base.matrix * total)
 
 
 def random_gravity_tm(

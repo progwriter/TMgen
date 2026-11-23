@@ -4,6 +4,7 @@ import numpy
 import pytest
 
 from tmgen.models import (
+    _peak_mean_cycle,
     exp_tm,
     gravity_tm,
     lognormal_tm,
@@ -103,3 +104,12 @@ def test_modulated_gravity_scales_base_by_sinusoid() -> None:
     tm = modulated_gravity_tm(3, 5, 10.0, rng=1)
     ratio = tm.matrix / tm.matrix[:, :, :1]
     numpy.testing.assert_allclose(ratio, numpy.broadcast_to(ratio[0, 0], ratio.shape))
+
+
+@pytest.mark.parametrize("num_nodes", [2, 10])
+def test_modulated_gravity_epoch_totals_follow_sinusoid(num_nodes: int) -> None:
+    tm = modulated_gravity_tm(num_nodes, 48, 100.0, pm_ratio=2, t_ratio=1, rng=0)
+    totals = tm.matrix.sum(axis=(0, 1))
+    expected = _peak_mean_cycle(1 / 24, 48, 100.0, 2, 1)
+    numpy.testing.assert_allclose(totals, expected, atol=1e-9)
+    assert totals.mean() == pytest.approx(100.0, rel=0.05)

@@ -43,6 +43,9 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 ### Fixed
 
+- `modulated_gravity_tm` scaled the traffic by an extra `mean_traffic /
+  num_nodes`, so the total of each epoch did not follow the requested
+  total-traffic cycle.
 - `modulated_gravity_tm` raised `TypeError` for epoch counts passed as floats
   (#9).
 - `TrafficMatrix.mean()` returned the maximum over epochs instead of the mean.
