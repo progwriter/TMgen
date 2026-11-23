@@ -4,6 +4,21 @@ from numpy.typing import ArrayLike, NDArray
 from tmgen.exceptions import TMgenException
 from tmgen.tm import TrafficMatrix
 
+RngLike = numpy.random.Generator | int | None
+"""Seed or generator accepted by the random models.
+
+``None`` draws from NumPy's global state (so ``numpy.random.seed`` keeps
+working); an ``int`` seeds a fresh generator; a ``Generator`` is used as is.
+"""
+
+
+def _resolve_rng(
+    rng: RngLike,
+) -> numpy.random.Generator | numpy.random.RandomState:
+    if rng is None:
+        return numpy.random.mtrand._rand
+    return numpy.random.default_rng(rng)
+
 
 def _peak_mean_cycle(
     freq: float,
@@ -66,6 +81,8 @@ def modulated_gravity_tm(
     diurnal_freq: float = 1 / 24,
     spatial_variance: float = 100,
     temporal_variance: float = 0.01,
+    *,
+    rng: RngLike = None,
 ) -> TrafficMatrix:
     """
     Generate a modulated gravity traffic matrix with the given parameters
@@ -83,6 +100,7 @@ def modulated_gravity_tm(
         Pick something reasonable with respect to your mean_traffic.
         Default is 100
     :param temporal_variance: Variance on the volume in time
+    :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return:
     """
 
@@ -93,14 +111,18 @@ def modulated_gravity_tm(
         sinusoid = sinusoid + numpy.absolute(numpy.min(sinusoid))
         mean_traffic = numpy.mean(sinusoid)
 
-    base_random_gravity_tm = random_gravity_tm(num_nodes, mean_traffic / num_nodes)
+    base_random_gravity_tm = random_gravity_tm(
+        num_nodes, mean_traffic / num_nodes, rng=rng
+    )
     tm = numpy.concatenate(
         [base_random_gravity_tm.matrix * x for x in sinusoid], axis=2
     )
     return TrafficMatrix(tm)
 
 
-def random_gravity_tm(num_nodes: int, mean_traffic: float) -> TrafficMatrix:
+def random_gravity_tm(
+    num_nodes: int, mean_traffic: float, *, rng: RngLike = None
+) -> TrafficMatrix:
     """
     Random gravity model, parametrized by the mean traffic per ingress-egress
     pair.
@@ -108,9 +130,10 @@ def random_gravity_tm(num_nodes: int, mean_traffic: float) -> TrafficMatrix:
 
     :param num_nodes: number of nodes in the network
     :param mean_traffic: average traffic volume between a pair of nodes
+    :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: a new :py:class:`~TrafficMatrix`
     """
-    dist = numpy.random.rand(num_nodes, 1)
+    dist = _resolve_rng(rng).random((num_nodes, 1))
     dist = dist / sum(dist)
     matrix = numpy.matmul(dist, dist.T).clip(min=0) * mean_traffic
     matrix = matrix.reshape((num_nodes, num_nodes, 1))
@@ -148,7 +171,12 @@ def gravity_tm(populations: ArrayLike, total_traffic: float) -> TrafficMatrix:
 
 
 def uniform_tm(
-    num_nodes: int, low: float, high: float, num_epochs: int = 1
+    num_nodes: int,
+    low: float,
+    high: float,
+    num_epochs: int = 1,
+    *,
+    rng: RngLike = None,
 ) -> TrafficMatrix:
     """
     Return a uniform traffic matrix. Entries are chosen independently from each other,
@@ -157,7 +185,8 @@ def uniform_tm(
     :param num_nodes: number of points-of-presence
     :param low: lowest allowed value
     :param high: highest allowed value
-    :param num_epochs: number of
+    :param num_epochs: number of epochs
+    :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
     """
     if num_nodes < 0 or low < 0 or high < 0:
@@ -166,7 +195,7 @@ def uniform_tm(
         # Swap the values
         low, high = high, low
     # Get random tm
-    r = numpy.random.rand(num_nodes, num_nodes, num_epochs)
+    r = _resolve_rng(rng).random((num_nodes, num_nodes, num_epochs))
     return TrafficMatrix(
         numpy.reshape(low + (high - low) * r, (num_nodes, num_nodes, num_epochs)).clip(
             min=0
@@ -174,7 +203,9 @@ def uniform_tm(
     )
 
 
-def exp_tm(num_nodes: int, mean_traffic: float, num_epochs: int = 1) -> TrafficMatrix:
+def exp_tm(
+    num_nodes: int, mean_traffic: float, num_epochs: int = 1, *, rng: RngLike = None
+) -> TrafficMatrix:
     """
     Exponential traffic matrix. Values are drawn from an exponential distribution,
     with a mean value of *mean_traffic*.
@@ -182,17 +213,23 @@ def exp_tm(num_nodes: int, mean_traffic: float, num_epochs: int = 1) -> TrafficM
     :param num_nodes:  number of nodes in the network
     :param mean_traffic: mean value of the distribution
     :param num_epochs: number of epochs in the traffic matrix
+    :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
     """
     return TrafficMatrix(
-        numpy.random.exponential(
-            mean_traffic, size=(num_nodes, num_nodes, num_epochs)
-        ).clip(min=0)
+        _resolve_rng(rng)
+        .exponential(mean_traffic, size=(num_nodes, num_nodes, num_epochs))
+        .clip(min=0)
     )
 
 
 def spike_tm(
-    num_nodes: int, num_spikes: int, mean_spike: float, num_epochs: int = 1
+    num_nodes: int,
+    num_spikes: int,
+    mean_spike: float,
+    num_epochs: int = 1,
+    *,
+    rng: RngLike = None,
 ) -> TrafficMatrix:
     """
     Generate a traffic matrix using the spike model.
@@ -201,6 +238,7 @@ def spike_tm(
     :param num_spikes: number of ingress-egress spikes. Must be fewer than :math:`n^2`
     :param mean_spike: average volume of a single spike
     :param num_epochs: number of time epochs
+    :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
     """
     if not num_spikes < num_nodes * num_nodes:
@@ -208,9 +246,10 @@ def spike_tm(
             "Number of spikes cannot be larger than number of ingress-egress pairs"
         )
     # Start by generating a non-negative exponential matrix
-    tm = numpy.random.exponential(
-        mean_spike, size=(num_nodes, num_nodes, num_epochs)
-    ).clip(min=0)
+    gen = _resolve_rng(rng)
+    tm = gen.exponential(mean_spike, size=(num_nodes, num_nodes, num_epochs)).clip(
+        min=0
+    )
 
     # This generates a "mask" for which values to zero out. We need all values
     # except num_spikes to be 0s. So we generete an 1-d array of num_spikes ones
@@ -221,7 +260,7 @@ def spike_tm(
         (numpy.ones(num_spikes), numpy.zeros(num_nodes * num_nodes - num_spikes))
     )
     for e in range(num_epochs):
-        numpy.random.shuffle(mask)
+        gen.shuffle(mask)
         reshaped_mask = mask.reshape((num_nodes, num_nodes))
         tm[:, :, e][reshaped_mask == 0] = 0
 
@@ -229,7 +268,12 @@ def spike_tm(
 
 
 def lognormal_tm(
-    num_nodes: int, mean_traffic: float, sigma: float = 1, num_epochs: int = 1
+    num_nodes: int,
+    mean_traffic: float,
+    sigma: float = 1,
+    num_epochs: int = 1,
+    *,
+    rng: RngLike = None,
 ) -> TrafficMatrix:
     """
     Lognormal traffic matrix. Values are drawn from a lognormal distribution.
@@ -239,12 +283,15 @@ def lognormal_tm(
         *not* the mean of the resulting lognormal samples
     :param sigma: standard deviation of the underlying normal distribution
     :param num_epochs: number of epochs in the traffic matrix
+    :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
     """
     return TrafficMatrix(
-        numpy.random.lognormal(
+        _resolve_rng(rng)
+        .lognormal(
             mean=mean_traffic, sigma=sigma, size=(num_nodes, num_nodes, num_epochs)
-        ).clip(min=0)
+        )
+        .clip(min=0)
     )
 
 
@@ -263,6 +310,7 @@ def exact_tm(num_nodes: int, val: float, num_epochs: int = 1) -> TrafficMatrix:
 
 
 __all__ = [
+    "RngLike",
     "modulated_gravity_tm",
     "random_gravity_tm",
     "gravity_tm",

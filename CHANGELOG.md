@@ -17,6 +17,9 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 - Type stubs and a `py.typed` marker.
 - `tmgen.__version__`.
 - `lognormal_tm` is exported from `tmgen.models`.
+- Keyword-only `rng` argument (seed or `numpy.random.Generator`) on every
+  random model for reproducible, isolated randomness. Without it the models
+  still draw from NumPy's global state, so `numpy.random.seed` works as before.
 
 ### Changed
 
