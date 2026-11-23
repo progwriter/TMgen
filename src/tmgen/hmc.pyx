@@ -229,7 +229,7 @@ cdef numpy.ndarray hmc_exact(numpy.ndarray f, numpy.ndarray g,
 
     if rng is None:
         # the global state keeps numpy.random.seed working
-        sampler = numpy.random.mtrand._rand
+        sampler = numpy.random
     else:
         sampler = numpy.random.default_rng(rng)
 

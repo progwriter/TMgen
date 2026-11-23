@@ -451,3 +451,13 @@ def test_modulated_gravity_spatial_variance_applies_to_ingress_and_egress() -> N
     ingress = tm.at_time(0).sum(axis=1)
     egress = tm.at_time(0).sum(axis=0)
     assert not numpy.allclose(ingress, egress)
+
+
+def test_default_rng_is_numpys_global_legacy_stream() -> None:
+    # documented behavior: numpy.random.seed keeps working, with the same
+    # stream as calling the legacy numpy.random functions directly
+    numpy.random.seed(5)
+    model = exp_tm(3, 7.0, num_epochs=2)
+    numpy.random.seed(5)
+    direct = numpy.random.exponential(7.0, size=(3, 3, 2))
+    numpy.testing.assert_array_equal(model.matrix, direct)

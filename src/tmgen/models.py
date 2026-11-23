@@ -8,6 +8,8 @@ mean of one entry. Every model generates traffic from a node to itself (the
 diagonal); remove it with :py:meth:`~tmgen.tm.TrafficMatrix.zero_diagonal`.
 """
 
+from typing import Any
+
 import numpy
 from numpy.typing import ArrayLike, NDArray
 
@@ -48,16 +50,19 @@ def _number(value: float, name: str, *, minimum: float | None = 0) -> float:
     return number
 
 
-def _resolve_rng(
-    rng: RngLike,
-) -> numpy.random.Generator | numpy.random.RandomState:
+def _resolve_rng(rng: RngLike) -> Any:
+    """
+    A source of random numbers with the methods of ``numpy.random.Generator``
+    that the models use. ``None`` gives the ``numpy.random`` module itself, whose
+    functions draw from NumPy's global state (and so follow ``numpy.random.seed``).
+    """
     if rng is None:
-        return numpy.random.mtrand._rand
+        return numpy.random
     return numpy.random.default_rng(rng)
 
 
 def _truncated_normal(
-    gen: numpy.random.Generator | numpy.random.RandomState,
+    gen: Any,
     mean: NDArray[numpy.float64],
     std: float,
 ) -> NDArray[numpy.float64]:
