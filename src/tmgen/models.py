@@ -1133,4 +1133,12 @@ __all__ = [
     "spike_tm",
     "exact_tm",
     "lognormal_tm",
+    "fourier_profile",
+    "time_zone_profiles",
+    "ncim_tm",
+    "traffic_class_tm",
+    "datacenter_tm",
+    "elephants_and_mice_tm",
+    "fluctuating_tm",
+    "shot_noise_tm",
 ]

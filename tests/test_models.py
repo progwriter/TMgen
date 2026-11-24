@@ -1,3 +1,4 @@
+import inspect
 import math
 from collections.abc import Callable
 from typing import Any
@@ -5,6 +6,7 @@ from typing import Any
 import numpy
 import pytest
 
+from tmgen import models
 from tmgen.exceptions import TMgenException
 from tmgen.models import (
     _truncated_normal,
@@ -921,3 +923,14 @@ def test_shot_noise_validates(kwargs: dict[str, Any]) -> None:
 def test_shot_noise_needs_one_epoch_of_means() -> None:
     with pytest.raises(TMgenException, match="one epoch"):
         shot_noise_tm(exact_tm(2, 1.0, num_epochs=2), 3, epoch_length=1.0, **_SHOT)
+
+
+def test_all_lists_every_public_function() -> None:
+    public = {
+        name
+        for name, obj in vars(models).items()
+        if inspect.isfunction(obj)
+        and obj.__module__ == models.__name__
+        and not name.startswith("_")
+    }
+    assert public <= set(models.__all__)
