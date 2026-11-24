@@ -46,22 +46,6 @@ def test_samples_satisfy_constraints() -> None:
     assert ((f @ xs + g[:, None]) > 0).all()
 
 
-def test_rng_seed_is_reproducible() -> None:
-    f, g, cov, mu, x0 = _constrained_problem()
-    a = hmc_sample(f, g, cov, mu, x0, 50, rng=3)
-    b = hmc_sample(f, g, cov, mu, x0, 50, rng=numpy.random.default_rng(3))
-    numpy.testing.assert_array_equal(a, b)
-
-
-def test_global_seed_is_reproducible() -> None:
-    f, g, cov, mu, x0 = _constrained_problem()
-    numpy.random.seed(5)
-    a = hmc_sample(f, g, cov, mu, x0, 50)
-    numpy.random.seed(5)
-    b = hmc_sample(f, g, cov, mu, x0, 50)
-    numpy.testing.assert_array_equal(a, b)
-
-
 def test_matvec_fallback_matches_gram(monkeypatch: pytest.MonkeyPatch) -> None:
     f, g, cov, mu, x0 = _constrained_problem()
     with_gram = hmc_sample(f, g, cov, mu, x0, 200, rng=2)

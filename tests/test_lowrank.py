@@ -54,12 +54,6 @@ def test_rank_can_be_chosen() -> None:
     assert LowRankModel.fit(many, 3).explained_variance < 1.0
 
 
-def test_sampling_is_reproducible(series: TrafficMatrix) -> None:
-    model = LowRankModel.fit(series)
-    assert model.sample(10, rng=4) == model.sample(10, rng=4)
-    assert model.sample(10, rng=4) != model.sample(10, rng=5)
-
-
 def test_a_single_epoch_can_be_sampled(series: TrafficMatrix) -> None:
     assert LowRankModel.fit(series).sample(1, rng=0).shape == (5, 5, 1)
 

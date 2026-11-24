@@ -8,6 +8,8 @@ import pytest
 
 from tmgen import models
 from tmgen.exceptions import TMgenException
+from tmgen.hmc import hmc_sample
+from tmgen.lowrank import LowRankModel
 from tmgen.models import (
     _truncated_normal,
     datacenter_tm,
@@ -30,80 +32,73 @@ from tmgen.models import (
 )
 from tmgen.tm import TrafficMatrix
 
-_RANDOM_MODELS: dict[str, Callable[..., TrafficMatrix]] = {
+_LOWRANK = LowRankModel.fit(modulated_gravity_tm(4, 48, 10.0, rng=0))
+_HMC = (numpy.eye(3), numpy.ones(3), numpy.eye(3), numpy.zeros(3), numpy.ones(3))
+
+_RANDOM_MODELS: dict[str, Callable[..., Any]] = {
     "modulated_gravity": lambda **kw: modulated_gravity_tm(4, 6, 10.0, **kw),
     "random_gravity": lambda **kw: random_gravity_tm(4, 10.0, **kw),
     "uniform": lambda **kw: uniform_tm(4, 1.0, 5.0, num_epochs=3, **kw),
     "exp": lambda **kw: exp_tm(4, 2.0, num_epochs=3, **kw),
     "spike": lambda **kw: spike_tm(4, 3, 2.0, num_epochs=3, **kw),
     "lognormal": lambda **kw: lognormal_tm(4, 1.0, num_epochs=3, **kw),
+    "ncim": lambda **kw: ncim_tm(numpy.ones(5), 3, **kw),
+    "ncim_node_traffic": lambda **kw: ncim_tm(
+        numpy.ones(5),
+        ingress_traffic=[1.0, 2.0, 3.0],
+        egress_traffic=[3.0, 2.0, 1.0],
+        **kw,
+    ),
+    "traffic_class": lambda **kw: traffic_class_tm(
+        [1.0, 2.0], [0, 1, 1], [[0.5, 0.25], [0.125, 0.125]], **kw
+    ),
+    "datacenter": lambda **kw: datacenter_tm(10, 1.0, **kw),
+    "elephants_and_mice": lambda **kw: elephants_and_mice_tm(5, **kw),
+    "fluctuating": lambda **kw: fluctuating_tm(exact_tm(3, 5e6), 4, **kw),
+    "shot_noise": lambda **kw: shot_noise_tm(
+        exact_tm(2, 2.0), 20, epoch_length=5.0, **_SHOT, **kw
+    ),
+    "lowrank": lambda **kw: _LOWRANK.sample(10, **kw),
+    "hmc": lambda **kw: hmc_sample(*_HMC, 20, **kw),
 }
 
 
-def test_modulated_gravity() -> None:
-    tm = modulated_gravity_tm(num_nodes=2, num_epochs=10, total_traffic=1.0)
-
-    assert tm.matrix.ndim == 3
-    assert tm.matrix.shape == (2, 2, 10)
-    assert (tm.matrix >= 0).all()
-
-
-def test_modulated_gravity_many_epochs() -> None:
-    # regression test for #9: float epoch count broke numpy.linspace
-    tm = modulated_gravity_tm(
-        num_nodes=14,
-        num_epochs=24,
-        total_traffic=3750,
-        peak_to_mean=1.5,
-        trough_to_mean=0.75,
-    )
-    assert tm.matrix.shape == (14, 14, 24)
-
-
-def test_lognormal_exported() -> None:
-    assert lognormal_tm(3, 1.0, num_epochs=2).matrix.shape == (3, 3, 2)
-
-
 @pytest.mark.parametrize("name", _RANDOM_MODELS)
-def test_int_seed_is_reproducible(name: str) -> None:
+def test_rng_contract(name: str) -> None:
     model = _RANDOM_MODELS[name]
-    a, b = model(rng=7), model(rng=7)
-    assert isinstance(a, TrafficMatrix)
-    numpy.testing.assert_array_equal(a.matrix, b.matrix)
-    assert not numpy.array_equal(a.matrix, model(rng=8).matrix)
-
-
-@pytest.mark.parametrize("name", _RANDOM_MODELS)
-def test_generator_matches_int_seed(name: str) -> None:
-    model = _RANDOM_MODELS[name]
+    a = numpy.asarray(model(rng=7))
+    numpy.testing.assert_array_equal(a, numpy.asarray(model(rng=7)))
+    assert not numpy.array_equal(a, numpy.asarray(model(rng=8)))
     numpy.testing.assert_array_equal(
-        model(rng=numpy.random.default_rng(7)).matrix, model(rng=7).matrix
+        a, numpy.asarray(model(rng=numpy.random.default_rng(7)))
     )
 
-
-@pytest.mark.parametrize("name", _RANDOM_MODELS)
-def test_rng_does_not_touch_global_state(name: str) -> None:
     numpy.random.seed(1)
     expected = numpy.random.random(3)
     numpy.random.seed(1)
-    _RANDOM_MODELS[name](rng=7)
+    model(rng=7)
     numpy.testing.assert_array_equal(numpy.random.random(3), expected)
 
-
-@pytest.mark.parametrize("name", _RANDOM_MODELS)
-def test_default_uses_global_seed(name: str) -> None:
-    model = _RANDOM_MODELS[name]
     numpy.random.seed(3)
-    a = model()
+    first = numpy.asarray(model())
     numpy.random.seed(3)
-    b = model()
-    numpy.testing.assert_array_equal(a.matrix, b.matrix)
+    numpy.testing.assert_array_equal(first, numpy.asarray(model()))
 
 
-@pytest.mark.parametrize("name", _RANDOM_MODELS)
-def test_rng_is_keyword_only(name: str) -> None:
-    with pytest.raises(TypeError):
-        random_gravity_tm(3, 1.0, 7)  # type: ignore[call-arg,arg-type]
+def test_rng_is_keyword_only() -> None:
+    functions: list[Callable[..., Any]] = [
+        f
+        for name, f in vars(models).items()
+        if name in models.__all__
+        and inspect.isfunction(f)
+        and "rng" in inspect.signature(f).parameters
+    ]
+    assert len(functions) == 12
+    for f in [*functions, LowRankModel.sample]:
+        assert (
+            inspect.signature(f).parameters["rng"].kind
+            is inspect.Parameter.KEYWORD_ONLY
+        )
 
 
 def test_spike_has_exactly_num_spikes_in_total() -> None:
@@ -331,6 +326,7 @@ def test_equal_bounds_and_integral_floats_are_accepted() -> None:
     assert exp_tm(3.0, 1.0, num_epochs=2.0).matrix.shape == (3, 3, 2)  # type: ignore[arg-type]
     assert exact_tm(2, 0.0).matrix.sum() == 0
     assert spike_tm(2, 4, 1.0).matrix.shape == (2, 2, 1)
+    assert modulated_gravity_tm(3, 24.0, 1.0).matrix.shape == (3, 3, 24)  # type: ignore[arg-type]
 
 
 _RENAMES: list[tuple[Callable[..., TrafficMatrix], dict[str, Any], dict[str, Any]]] = [
@@ -597,12 +593,6 @@ def test_ncim_zero_total_gives_an_empty_epoch() -> None:
     assert (tm.at_time(0) == 0).all()
 
 
-def test_ncim_is_reproducible() -> None:
-    a = ncim_tm(numpy.ones(5), 3, rng=7)
-    b = ncim_tm(numpy.ones(5), 3, rng=7)
-    assert a == b
-
-
 @pytest.mark.parametrize(
     "kwargs",
     [
@@ -659,11 +649,6 @@ def test_traffic_class_with_one_class_is_random_gravity_with_exact_total() -> No
     tm = traffic_class_tm([7.0], [0, 0, 0, 0], [[1.0]], rng=1)
     assert tm.shape == (4, 4, 1)
     assert tm.matrix.sum() == pytest.approx(7.0)
-
-
-def test_traffic_class_is_reproducible() -> None:
-    args: tuple[Any, ...] = ([1.0, 2.0], [0, 1, 1], [[0.5, 0.25], [0.125, 0.125]])
-    assert traffic_class_tm(*args, rng=3) == traffic_class_tm(*args, rng=3)
 
 
 @pytest.mark.parametrize(
@@ -724,12 +709,6 @@ def test_datacenter_without_skew_is_uniform_off_the_diagonal() -> None:
     numpy.testing.assert_allclose(m[:, :, 0][off], 1.0)
 
 
-def test_datacenter_is_reproducible() -> None:
-    a = datacenter_tm(10, 1.0, rng=5)
-    assert a == datacenter_tm(10, 1.0, rng=5)
-    assert a != datacenter_tm(10, 1.0, rng=6)
-
-
 @pytest.mark.parametrize(
     "kwargs",
     [
@@ -785,10 +764,6 @@ def test_elephants_and_mice_all_small_are_gamma() -> None:
     assert rates.matrix.var() == pytest.approx(18.0, rel=0.1)
 
 
-def test_elephants_and_mice_is_reproducible() -> None:
-    assert elephants_and_mice_tm(5, rng=1) == elephants_and_mice_tm(5, rng=1)
-
-
 @pytest.mark.parametrize(
     "kwargs",
     [
@@ -828,11 +803,6 @@ def test_fluctuations_never_go_negative_and_keep_zero_flows_at_zero() -> None:
     tm = fluctuating_tm(means, 200, rng=0)
     assert (tm.matrix >= 0).all()
     assert (tm.matrix[0, 0] == 0).all()
-
-
-def test_fluctuations_are_reproducible() -> None:
-    means = elephants_and_mice_tm(4, rng=0)
-    assert fluctuating_tm(means, 5, rng=2) == fluctuating_tm(means, 5, rng=2)
 
 
 @pytest.mark.parametrize(
@@ -894,12 +864,6 @@ def test_shot_noise_without_traffic_stays_empty() -> None:
     tm = shot_noise_tm(means, 50, epoch_length=5.0, rng=0, **_SHOT)
     assert (tm.matrix[0, 0] == 0).all()
     assert (tm.matrix >= 0).all()
-
-
-def test_shot_noise_is_reproducible() -> None:
-    means = exact_tm(2, 2.0)
-    a = shot_noise_tm(means, 20, epoch_length=5.0, rng=3, **_SHOT)
-    assert a == shot_noise_tm(means, 20, epoch_length=5.0, rng=3, **_SHOT)
 
 
 @pytest.mark.parametrize(
