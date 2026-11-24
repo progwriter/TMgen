@@ -15,6 +15,12 @@ Learning from measurements
 .. autoclass:: tmgen.lowrank.LowRankModel
   :members: fit, sample, num_nodes, rank
 
+Datasets
+--------
+
+.. automodule:: tmgen.datasets
+  :members: load_abilene, data_dir, ABILENE_NODES, ABILENE_WEEKS, ABILENE_URL
+
 TrafficMatrix
 -------------
 

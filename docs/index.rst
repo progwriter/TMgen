@@ -55,6 +55,7 @@ Where to go next
    concepts
    models
    lowrank
+   datasets
    io
    sampling
    plotting

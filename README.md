@@ -45,8 +45,9 @@ tm.zero_diagonal().save("day.npz")
 | Uniform, exponential, lognormal | `uniform_tm`, `exp_tm`, `lognormal_tm` | Independent random entries |
 | Exact | `exact_tm` | Every entry the same, for tests |
 
-To learn from your own measurements instead, `tmgen.lowrank.LowRankModel` fits a
-low-rank model to a series of matrices and samples new ones.
+To work from real traffic, `tmgen.datasets.load_abilene` downloads the public
+Abilene matrices, and `tmgen.lowrank.LowRankModel` fits a low-rank model to a
+series of matrices and samples new ones.
 
 Any spatial model can be combined with any temporal pattern using
 `TrafficMatrix.modulate` and `diurnal_profile`. The sampler behind the paper's
