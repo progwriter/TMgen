@@ -261,6 +261,31 @@ classes is exactly its fraction of the total:
 Pass a ``(num_classes, num_classes, num_epochs)`` array to change the fractions
 over time.
 
+Elephants, mice and fluctuations
+--------------------------------
+
+Measured backbone matrices have a few very large flows and many small ones
+spanning several orders of magnitude, and no single distribution fits them. Nucci,
+Sridharan and Taft [#nucci2005]_ fit the medium and large flows with a lognormal
+distribution and the small flows with a gamma distribution.
+:py:func:`~tmgen.models.elephants_and_mice_tm` draws a matrix of mean rates that
+way; the defaults are the paper's fit to the Sprint-Europe backbone, in bytes
+per second. :py:func:`~tmgen.models.fluctuating_tm` then turns the means into a
+time series by adding independent Gaussian noise whose size grows with the
+mean, following the power law the paper measured:
+
+>>> from tmgen.models import elephants_and_mice_tm, fluctuating_tm
+>>> means = elephants_and_mice_tm(num_nodes=8, rng=1)
+>>> tm = fluctuating_tm(means, num_epochs=6, rng=2)
+>>> tm.shape
+(8, 8, 6)
+
+Epochs of the result are not correlated with each other. The paper prints the
+power law in a form that contradicts its own figure; TMgen follows the figure,
+see the function's documentation. Mapping the rates to the node pairs of a
+topology, the paper's other step, needs link capacities and routing, which
+TMgen does not model.
+
 Data centres: hot nodes and racks
 ---------------------------------
 
@@ -321,3 +346,8 @@ References
 .. [#trafpy] Christopher W. F. Parsonson, Joshua L. Benjamin and Georgios
    Zervas. *Traffic generation for benchmarking data centre networks*. Optical
    Switching and Networking 46, 2022. https://arxiv.org/abs/2107.01398
+
+.. [#nucci2005] Antonio Nucci, Ashwin Sridharan and Nina Taft. *The problem of
+   synthetically generating IP traffic matrices: initial recommendations*. ACM
+   SIGCOMM Computer Communication Review 35(3), July 2005.
+   https://doi.org/10.1145/1070873.1070876

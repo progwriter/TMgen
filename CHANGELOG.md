@@ -14,6 +14,7 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 - `fourier_profile`: a cyclical profile built from Fourier components (eq. 8 of the paper).
 - `ncim_tm`: the paper's non-stationary conditionally independent model (eqs. 14 and 15), with optional per-node ingress and egress traffic and truncated-normal variance control.
+- `elephants_and_mice_tm` and `fluctuating_tm`: mean rates with lognormal large flows and gamma small flows, and Gaussian fluctuations around them whose size follows a power law of the mean (Nucci et al., 2005).
 - `tmgen.lowrank.LowRankModel`: learn the main patterns of a measured series of matrices (PCA with an autoregressive weight per component) and sample new series.
 - `datacenter_tm`: a data centre matrix with hot nodes and racks, after the node distributions of TrafPy.
 - `traffic_class_tm`: traffic classes (eq. 17 of the paper), where nodes are grouped into classes and you set the fraction of traffic between each pair of classes.

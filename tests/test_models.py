@@ -10,8 +10,10 @@ from tmgen.models import (
     _truncated_normal,
     datacenter_tm,
     diurnal_profile,
+    elephants_and_mice_tm,
     exact_tm,
     exp_tm,
+    fluctuating_tm,
     fourier_profile,
     gravity_tm,
     lognormal_tm,
@@ -752,3 +754,94 @@ def test_datacenter_validates(kwargs: dict[str, Any]) -> None:
     args: dict[str, Any] = {"num_nodes": 10, "total_traffic": 1.0, **kwargs}
     with pytest.raises(TMgenException):
         datacenter_tm(**args)
+
+
+def test_elephants_and_mice_defaults_span_orders_of_magnitude() -> None:
+    tm = elephants_and_mice_tm(60, rng=0)
+    assert tm.shape == (60, 60, 1)
+    rates = tm.matrix[:, :, 0]
+    assert (rates > 0).all()
+    assert numpy.log10(rates.max() / rates.min()) > 5
+    assert (rates < 1e6).mean() == pytest.approx(0.52, abs=0.05)
+
+
+def test_elephants_and_mice_all_large_are_lognormal() -> None:
+    rates = elephants_and_mice_tm(
+        80, small_fraction=0, large_mu=3.0, large_sigma=0.5, rng=0
+    )
+    logs = numpy.log(rates.matrix)
+    assert logs.mean() == pytest.approx(3.0, abs=0.05)
+    assert logs.std() == pytest.approx(0.5, abs=0.05)
+
+
+def test_elephants_and_mice_all_small_are_gamma() -> None:
+    rates = elephants_and_mice_tm(
+        80, small_fraction=1, small_shape=2.0, small_scale=3.0, rng=0
+    )
+    assert rates.matrix.mean() == pytest.approx(6.0, rel=0.05)
+    assert rates.matrix.var() == pytest.approx(18.0, rel=0.1)
+
+
+def test_elephants_and_mice_is_reproducible() -> None:
+    assert elephants_and_mice_tm(5, rng=1) == elephants_and_mice_tm(5, rng=1)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"small_fraction": 1.5},
+        {"small_fraction": -0.1},
+        {"large_sigma": -1.0},
+        {"small_shape": 0.0},
+        {"small_scale": 0.0},
+        {"large_mu": numpy.nan},
+    ],
+)
+def test_elephants_and_mice_validates(kwargs: dict[str, Any]) -> None:
+    with pytest.raises(TMgenException):
+        elephants_and_mice_tm(3, **kwargs)
+
+
+def test_fluctuations_follow_the_power_law() -> None:
+    means = TrafficMatrix(numpy.array([[2e7, 1e7], [5e6, 3e6]])[:, :, None])
+    tm = fluctuating_tm(means, 20000, rng=0)
+    for index in numpy.ndindex(2, 2):
+        mean = means.matrix[index][0]
+        expected = 1e6 * 10**-0.33 * (mean / 1e6) ** 0.8
+        series = tm.matrix[index]
+        assert series.mean() == pytest.approx(mean, rel=0.02)
+        assert series.std() == pytest.approx(expected, rel=0.03)
+
+
+def test_fluctuations_are_in_proportion_to_the_unit() -> None:
+    base = TrafficMatrix(numpy.array([[4.0, 8.0], [2.0, 6.0]])[:, :, None])
+    in_bytes = fluctuating_tm(base * 1e6, 50, unit=1e6, rng=3)
+    in_megabytes = fluctuating_tm(base, 50, unit=1, rng=3)
+    numpy.testing.assert_allclose(in_bytes.matrix, in_megabytes.matrix * 1e6)
+
+
+def test_fluctuations_never_go_negative_and_keep_zero_flows_at_zero() -> None:
+    means = TrafficMatrix(numpy.array([[0.0, 1e3], [1e5, 0.0]])[:, :, None])
+    tm = fluctuating_tm(means, 200, rng=0)
+    assert (tm.matrix >= 0).all()
+    assert (tm.matrix[0, 0] == 0).all()
+
+
+def test_fluctuations_are_reproducible() -> None:
+    means = elephants_and_mice_tm(4, rng=0)
+    assert fluctuating_tm(means, 5, rng=2) == fluctuating_tm(means, 5, rng=2)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [{"psi": -1.0}, {"gamma": numpy.nan}, {"unit": 0.0}, {"num_epochs": 0}],
+)
+def test_fluctuations_validate(kwargs: dict[str, Any]) -> None:
+    args: dict[str, Any] = {"num_epochs": 3, **kwargs}
+    with pytest.raises(TMgenException):
+        fluctuating_tm(exact_tm(2, 1.0), **args)
+
+
+def test_fluctuations_need_one_epoch_of_means() -> None:
+    with pytest.raises(TMgenException, match="one epoch"):
+        fluctuating_tm(exact_tm(2, 1.0, num_epochs=2), 3)

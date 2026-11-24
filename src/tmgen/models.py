@@ -858,6 +858,120 @@ def lognormal_tm(
     )
 
 
+def elephants_and_mice_tm(
+    num_nodes: int,
+    *,
+    small_fraction: float = 0.55,
+    large_mu: float = 15.45,
+    large_sigma: float = 0.885,
+    small_shape: float = 0.56,
+    small_scale: float = 4.18e5,
+    rng: RngLike = None,
+) -> TrafficMatrix:
+    """
+    A matrix of mean rates with a few large flows and many small ones, after
+    Nucci, Sridharan and Taft, *The problem of synthetically generating IP
+    traffic matrices* (ACM CCR, July 2005).
+
+    Measured backbone matrices span several orders of magnitude and no single
+    distribution fits them. The paper splits the flows at 1 MB/s: medium and
+    large flows (95% of the traffic) are lognormal and small flows are gamma
+    distributed. This function draws each entry as small with probability
+    *small_fraction* and as large otherwise. The defaults are the paper's fit
+    to the Sprint-Europe backbone, in bytes per second.
+
+    The matrices include traffic from each node to itself (the diagonal). Use
+    :py:func:`fluctuating_tm` to turn the means into a time series.
+
+    :param num_nodes: number of nodes in the network
+    :param small_fraction: the probability that an entry is a small flow,
+        between 0 and 1. About 0.55 for Sprint-Europe
+    :param large_mu: mean of the underlying normal of the large flows (the
+        natural log of their rate)
+    :param large_sigma: standard deviation of that normal
+    :param small_shape: shape of the gamma distribution of small flows
+    :param small_scale: scale of the gamma distribution of small flows (their
+        mean is ``small_shape * small_scale``)
+    :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
+    :return: a new :py:class:`~TrafficMatrix` with one epoch
+    """
+    num_nodes = _count(num_nodes, "num_nodes")
+    small_fraction = _number(small_fraction, "small_fraction")
+    if small_fraction > 1:
+        raise TMgenException("small_fraction must be at most 1")
+    large_mu = _number(large_mu, "large_mu", minimum=None)
+    large_sigma = _number(large_sigma, "large_sigma")
+    small_shape = _number(small_shape, "small_shape")
+    small_scale = _number(small_scale, "small_scale")
+    if small_shape == 0 or small_scale == 0:
+        raise TMgenException("small_shape and small_scale must be positive")
+    gen = _resolve_rng(rng)
+    shape = (num_nodes, num_nodes)
+    small = gen.random(shape) < small_fraction
+    large_rates = gen.lognormal(mean=large_mu, sigma=large_sigma, size=shape)
+    small_rates = gen.gamma(small_shape, small_scale, size=shape)
+    return TrafficMatrix._from_owned(
+        numpy.where(small, small_rates, large_rates)[:, :, None]
+    )
+
+
+def fluctuating_tm(
+    means: TrafficMatrix,
+    num_epochs: int,
+    *,
+    psi: float = 10**-0.33,
+    gamma: float = 0.8,
+    unit: float = 1e6,
+    rng: RngLike = None,
+) -> TrafficMatrix:
+    """
+    A time series of matrices that fluctuate around given mean rates, after
+    Nucci, Sridharan and Taft, *The problem of synthetically generating IP
+    traffic matrices* (ACM CCR, July 2005).
+
+    Each entry is its mean :math:`\\bar x` plus zero-mean Gaussian noise, with
+    an independent draw in every epoch, so the epochs are not correlated. The
+    standard deviation :math:`\\sigma` of the noise follows the power law
+    between mean and standard deviation measured on backbone traffic (Fig. 8 of
+    the paper): :math:`\\sigma = \\psi\\, \\bar x^{\\gamma}` with rates in MB/s,
+    that is :math:`\\psi` is the standard deviation of a 1 MB/s flow. Values
+    are clipped at zero.
+
+    The defaults are the paper's fit to the Sprint-Europe backbone
+    (:math:`\\gamma = 0.8`, :math:`\\log_{10}\\psi = -0.33`); for Abilene it
+    found :math:`\\gamma = 0.93` and :math:`\\log_{10}\\psi = -0.31`. The
+    paper prints the relation as :math:`\\bar x = \\psi\\sigma^\\gamma`, which
+    with these values makes large flows fluctuate more than their size and
+    contradicts its Fig. 8, whose fitted line has slope :math:`\\gamma` for
+    :math:`\\log \\sigma` against :math:`\\log \\bar x`; this follows the figure.
+    The paper does not state the logarithm base: 10, as on the figure's axes,
+    is assumed.
+
+    :param means: the mean rate of each entry, a matrix with one epoch, for
+        example from :py:func:`elephants_and_mice_tm`
+    :param num_epochs: number of epochs to generate
+    :param psi: :math:`\\psi`, the standard deviation of a flow of 1 MB/s
+    :param gamma: :math:`\\gamma`, the exponent of the power law
+    :param unit: how many of your volume units make one MB/s. The default,
+        1e6, is for volumes in bytes per second; use 1 if they are in MB/s
+    :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
+    :return: a new :py:class:`~TrafficMatrix`
+    """
+    if means.num_epochs != 1:
+        raise TMgenException("means must be a matrix with one epoch")
+    num_epochs = _count(num_epochs, "num_epochs")
+    psi = _number(psi, "psi")
+    gamma = _number(gamma, "gamma")
+    unit = _number(unit, "unit")
+    if unit == 0:
+        raise TMgenException("unit must be positive")
+    mean = means.matrix[:, :, :1]
+    std = unit * psi * (mean / unit) ** gamma
+    gen = _resolve_rng(rng)
+    noise = gen.standard_normal((means.num_nodes, means.num_nodes, num_epochs))
+    return TrafficMatrix._from_owned(numpy.clip(mean + std * noise, 0, None))
+
+
 @renamed_arguments(val="value")
 def exact_tm(num_nodes: int, value: float, num_epochs: int = 1) -> TrafficMatrix:
     """
