@@ -33,6 +33,10 @@ Where to go next
 :doc:`models`
    The models, when to use each, and how to combine them.
 
+:doc:`lowrank`, :doc:`datasets`, :doc:`metrics`
+   Learn a model from measured matrices, load real Abilene traffic, and compare
+   synthetic with real series.
+
 :doc:`io`
    Reading entries, NumPy interoperability, and the ``.npz`` and CSV formats.
 

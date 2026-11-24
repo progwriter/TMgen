@@ -44,6 +44,30 @@ Choosing a model
      - Independent entries
      - Any
      - Heavy-tailed unstructured load
+   * - :py:func:`~tmgen.models.ncim_tm`
+     - Conditionally independent entries
+     - Daily cycle
+     - The paper's NCIM, with per-node traffic and variance control
+   * - :py:func:`~tmgen.models.traffic_class_tm`
+     - Gravity within and between node classes
+     - Daily cycle
+     - Traffic shares between groups of nodes
+   * - :py:func:`~tmgen.models.datacenter_tm`
+     - Hot nodes and racks
+     - One epoch
+     - Data centre skew and rack locality
+   * - :py:func:`~tmgen.models.elephants_and_mice_tm`
+     - Lognormal large, gamma small flows
+     - One epoch
+     - Mean rates of a backbone link
+   * - :py:func:`~tmgen.models.fluctuating_tm`
+     - Gaussian around given means
+     - Any
+     - Noise whose size follows the mean
+   * - :py:func:`~tmgen.models.shot_noise_tm`
+     - Poisson flow arrivals per node pair
+     - Any
+     - Bursty, flow-level series
    * - :py:func:`~tmgen.models.exact_tm`
      - Constant entries
      - Any
@@ -168,12 +192,6 @@ or add it to a smooth model:
 >>> tm = spike_tm(num_nodes=5, num_spikes=3, mean_spike=200, num_epochs=4, rng=0)
 >>> int((tm.matrix > 0).sum())
 3
-
-Matrices of the same shape can be added with ``+``, so a background model plus
-spikes is one line:
-
->>> background = exp_tm(num_nodes=5, mean_entry=10, num_epochs=4, rng=1)
->>> combined = background + tm
 
 Combining a spatial model with a temporal pattern
 -------------------------------------------------

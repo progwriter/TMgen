@@ -71,22 +71,10 @@ needed. For the plotting helpers, install the extra:
 
 ### From source
 
-Use this for the latest unreleased changes, or to try a modification. The HMC
-sampler is a small Cython extension, so you need a C compiler (Xcode command
-line tools on macOS, `build-essential` on Debian and Ubuntu, the Visual Studio
-Build Tools on Windows). NumPy, Cython and the other build requirements are
-fetched automatically.
-
-```
-git clone https://github.com/progwriter/TMgen
-cd TMgen
-pip install .                 # or ".[plotting]" for the plotting helpers
-```
-
-The version number comes from the git tags, so clone the repository (a plain
-source archive of a release also works) rather than downloading a snapshot of a
-branch. To work on TMgen itself, see [DEVELOPMENT.md](https://github.com/progwriter/TMgen/blob/master/DEVELOPMENT.md) for an
-editable install with the development tools.
+Building needs a C compiler (the HMC sampler is a Cython extension). Clone the
+repository (the version comes from git tags) and `pip install .`; see
+[DEVELOPMENT.md](https://github.com/progwriter/TMgen/blob/master/DEVELOPMENT.md)
+for an editable install with the development tools.
 
 ## Documentation
 
