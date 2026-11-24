@@ -6,11 +6,12 @@ each node of a network to each other node, optionally over time. Use it to test
 routing, traffic engineering and topology design code when you do not have (or
 cannot share) real measurements.
 
-It implements the maximum entropy models of *Spatiotemporal Traffic Matrix
-Synthesis* by Paul Tune and Matthew Roughan (ACM SIGCOMM 2015) next to the
-simple models people usually start with, and gives you a small
-:py:class:`~tmgen.TrafficMatrix` object to work with the results: NumPy
-interoperability, safe file formats, and basic plots.
+It is a collection of synthesis techniques from the research literature, each
+credited to its paper in :doc:`models`, next to the simple models people usually
+start with. They all return the same small :py:class:`~tmgen.TrafficMatrix`
+object, with NumPy interoperability, safe file formats and basic plots, so you
+can swap one technique for another, combine them, and check the result against
+real traffic (:doc:`metrics`, :doc:`datasets`).
 
 .. code-block:: python
 
