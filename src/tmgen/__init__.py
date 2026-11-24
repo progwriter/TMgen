@@ -3,7 +3,7 @@ from importlib import metadata as _metadata
 from typing import TYPE_CHECKING as _TYPE_CHECKING
 from typing import Any as _Any
 
-from tmgen import hmc, models
+from tmgen import hmc, lowrank, models
 from tmgen.exceptions import TMgenException
 from tmgen.tm import TrafficMatrix
 
@@ -17,6 +17,7 @@ __all__ = [
     "TrafficMatrix",
     "__version__",
     "hmc",
+    "lowrank",
     "models",
     "plot",
 ]

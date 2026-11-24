@@ -54,6 +54,7 @@ Where to go next
    quickstart
    concepts
    models
+   lowrank
    io
    sampling
    plotting
