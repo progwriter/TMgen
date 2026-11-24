@@ -20,6 +20,7 @@ from tmgen.models import (
     modulated_gravity_tm,
     ncim_tm,
     random_gravity_tm,
+    shot_noise_tm,
     spike_tm,
     time_zone_profiles,
     traffic_class_tm,
@@ -845,3 +846,78 @@ def test_fluctuations_validate(kwargs: dict[str, Any]) -> None:
 def test_fluctuations_need_one_epoch_of_means() -> None:
     with pytest.raises(TMgenException, match="one epoch"):
         fluctuating_tm(exact_tm(2, 1.0, num_epochs=2), 3)
+
+
+_SHOT: dict[str, Any] = {"mean_flow_size": 20.0, "flow_rate": 2.0}
+
+
+def test_shot_noise_matches_the_mean_rates() -> None:
+    means = TrafficMatrix(numpy.array([[3.0, 6.0], [1.5, 4.0]])[:, :, None])
+    tm = shot_noise_tm(means, 4000, epoch_length=10.0, size_shape=4.0, rng=0, **_SHOT)
+    assert tm.shape == (2, 2, 4000)
+    numpy.testing.assert_allclose(
+        tm.matrix.mean(axis=2), means.matrix[:, :, 0], rtol=0.08
+    )
+
+
+def test_shot_noise_longer_epochs_average_shorter_ones() -> None:
+    means = TrafficMatrix(numpy.array([[3.0, 6.0], [1.5, 4.0]])[:, :, None])
+    # flows last about 10 s on average, so many span several 2 s epochs
+    short = shot_noise_tm(means, 200, epoch_length=2.0, rng=7, **_SHOT)
+    long = shot_noise_tm(means, 100, epoch_length=4.0, rng=7, **_SHOT)
+    averaged = short.matrix.reshape(2, 2, 100, 2).mean(axis=3)
+    numpy.testing.assert_allclose(long.matrix, averaged, atol=1e-9)
+
+
+def test_shot_noise_bigger_flows_are_burstier() -> None:
+    means = TrafficMatrix(numpy.array([[20.0, 20.0], [20.0, 20.0]])[:, :, None])
+    small = shot_noise_tm(
+        means, 500, epoch_length=5.0, mean_flow_size=5.0, flow_rate=5.0, rng=0
+    )
+    large = shot_noise_tm(
+        means, 500, epoch_length=5.0, mean_flow_size=200.0, flow_rate=5.0, rng=0
+    )
+    assert large.matrix.std() > 1.3 * small.matrix.std()
+
+
+def test_shot_noise_busier_pairs_vary_less_relative_to_their_mean() -> None:
+    means = TrafficMatrix(numpy.array([[1.0, 40.0], [1.0, 40.0]])[:, :, None])
+    tm = shot_noise_tm(means, 1000, epoch_length=5.0, size_shape=4.0, rng=1, **_SHOT)
+    cv = tm.matrix.std(axis=2) / tm.matrix.mean(axis=2)
+    assert (cv[:, 1] < cv[:, 0]).all()
+
+
+def test_shot_noise_without_traffic_stays_empty() -> None:
+    means = TrafficMatrix(numpy.array([[0.0, 2.0], [2.0, 0.0]])[:, :, None])
+    tm = shot_noise_tm(means, 50, epoch_length=5.0, rng=0, **_SHOT)
+    assert (tm.matrix[0, 0] == 0).all()
+    assert (tm.matrix >= 0).all()
+
+
+def test_shot_noise_is_reproducible() -> None:
+    means = exact_tm(2, 2.0)
+    a = shot_noise_tm(means, 20, epoch_length=5.0, rng=3, **_SHOT)
+    assert a == shot_noise_tm(means, 20, epoch_length=5.0, rng=3, **_SHOT)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"epoch_length": 0.0},
+        {"mean_flow_size": 0.0},
+        {"flow_rate": 0.0},
+        {"size_shape": 1.0},
+        {"warmup": -1.0},
+        {"num_epochs": 0},
+        {"mean_flow_size": 1e-9},
+    ],
+)
+def test_shot_noise_validates(kwargs: dict[str, Any]) -> None:
+    args: dict[str, Any] = {"num_epochs": 5, "epoch_length": 5.0, **_SHOT, **kwargs}
+    with pytest.raises(TMgenException):
+        shot_noise_tm(exact_tm(2, 2.0), **args)
+
+
+def test_shot_noise_needs_one_epoch_of_means() -> None:
+    with pytest.raises(TMgenException, match="one epoch"):
+        shot_noise_tm(exact_tm(2, 1.0, num_epochs=2), 3, epoch_length=1.0, **_SHOT)

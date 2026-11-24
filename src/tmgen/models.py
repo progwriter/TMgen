@@ -972,6 +972,136 @@ def fluctuating_tm(
     return TrafficMatrix._from_owned(numpy.clip(mean + std * noise, 0, None))
 
 
+_MAX_FLOWS = 50_000_000
+
+
+def shot_noise_tm(
+    means: TrafficMatrix,
+    num_epochs: int,
+    *,
+    epoch_length: float,
+    mean_flow_size: float,
+    flow_rate: float,
+    size_shape: float = 1.5,
+    warmup: float | None = None,
+    rng: RngLike = None,
+) -> TrafficMatrix:
+    """
+    A time series of matrices built from flows, with a Poisson shot-noise
+    process per node pair (Barakat, Thiran, Iannaccone, Diot and Owezarski,
+    *Modeling Internet backbone traffic at the flow level*, IEEE Transactions
+    on Signal Processing, 2003).
+
+    Flows of each node pair arrive as a Poisson process. A flow of size
+    :math:`s` is a rectangular shot: it sends at the constant rate
+    *flow_rate* for :math:`s` / *flow_rate*. Flow sizes are Pareto
+    distributed (heavy tailed). The rate of a pair at any time is the sum of
+    its active flows, and an entry of the result is that rate averaged over an
+    epoch. Arrivals are set so that the long-run mean rate of each pair is its
+    entry of *means*, whatever the other parameters. The fewer and larger the
+    flows, the burstier the series: at any instant the variance of the rate
+    is *flow_rate* times its mean (Campbell's theorem).
+
+    There is no correlation structure beyond what the flows overlap in time,
+    and no daily cycle: scale *means* per epoch with
+    :py:meth:`~tmgen.tm.TrafficMatrix.modulate` if you need one.
+
+    The matrices include traffic from each node to itself (the diagonal).
+
+    :param means: the long-run mean rate of each node pair, a matrix with one
+        epoch, for example from :py:func:`random_gravity_tm`. Rates are in
+        volume units per second
+    :param num_epochs: number of epochs to generate
+    :param epoch_length: duration of an epoch, in seconds
+    :param mean_flow_size: mean size of a flow, in volume units
+    :param flow_rate: sending rate of a flow, in volume units per second.
+        The mean duration of a flow is *mean_flow_size* / *flow_rate*
+    :param size_shape: the shape :math:`\\alpha` of the Pareto flow size
+        distribution, greater than 1 (smaller means a heavier tail)
+    :param warmup: how long before the first epoch flows start, in seconds, so
+        that the first epochs are in steady state. Default: 20 mean flow
+        durations
+    :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
+    :return: a new :py:class:`~TrafficMatrix`
+    :raises TMgenException: if the parameters imply too many flows (more than
+        50 million); use larger flows or a shorter series
+    """
+    if means.num_epochs != 1:
+        raise TMgenException("means must be a matrix with one epoch")
+    num_epochs = _count(num_epochs, "num_epochs")
+    epoch_length = _number(epoch_length, "epoch_length")
+    mean_flow_size = _number(mean_flow_size, "mean_flow_size")
+    flow_rate = _number(flow_rate, "flow_rate")
+    if epoch_length == 0 or mean_flow_size == 0 or flow_rate == 0:
+        raise TMgenException(
+            "epoch_length, mean_flow_size and flow_rate must be positive"
+        )
+    size_shape = _number(size_shape, "size_shape")
+    if size_shape <= 1:
+        raise TMgenException("size_shape must be greater than 1 for a finite mean")
+    if warmup is None:
+        warmup = 20 * mean_flow_size / flow_rate
+    warmup = _number(warmup, "warmup")
+    gen = _resolve_rng(rng)
+
+    num_nodes = means.num_nodes
+    rates = means.matrix[:, :, 0].ravel()
+    horizon = num_epochs * epoch_length
+    expected = rates / mean_flow_size * (horizon + warmup)
+    if expected.sum() > _MAX_FLOWS:
+        raise TMgenException(
+            f"This would simulate about {expected.sum():.3g} flows; use a larger "
+            "mean_flow_size or a shorter series"
+        )
+    counts = gen.poisson(expected)
+    pair = numpy.repeat(numpy.arange(rates.size), counts)
+    start = gen.uniform(-warmup, horizon, size=pair.size)
+    pareto_scale = mean_flow_size * (size_shape - 1) / size_shape
+    size = pareto_scale * (1 + gen.pareto(size_shape, size=pair.size))
+    end = start + size / flow_rate
+
+    # An entry is rate * (time a flow overlaps the epoch), summed over flows:
+    # partial overlaps at the first and last epoch of a flow, and a difference
+    # array for the epochs it covers completely.
+    clipped_start = numpy.maximum(start, 0.0)
+    clipped_end = numpy.minimum(end, horizon)
+    active = clipped_end > clipped_start
+    pair, clipped_start, clipped_end = (
+        pair[active],
+        clipped_start[active],
+        clipped_end[active],
+    )
+    first = numpy.minimum(
+        numpy.floor(clipped_start / epoch_length).astype(numpy.int64), num_epochs - 1
+    )
+    last = numpy.minimum(
+        numpy.floor(clipped_end / epoch_length).astype(numpy.int64), num_epochs - 1
+    )
+    width = num_epochs + 1
+    split = first != last
+    index = {
+        "first": pair * width + first,
+        "last": pair * width + last,
+        "fill": pair[split] * width,
+    }
+    first_amount = numpy.where(
+        split,
+        (first + 1) * epoch_length - clipped_start,
+        clipped_end - clipped_start,
+    )
+    last_amount = clipped_end - last * epoch_length
+    size_out = rates.size * width
+    volume = numpy.bincount(index["first"], first_amount, size_out)
+    volume += numpy.bincount(index["last"][split], last_amount[split], size_out)
+    whole = numpy.full(int(split.sum()), epoch_length)
+    fill = numpy.bincount(index["fill"] + first[split] + 1, whole, size_out)
+    fill -= numpy.bincount(index["fill"] + last[split], whole, size_out)
+    covered = numpy.cumsum(fill.reshape(rates.size, width), axis=1).ravel()
+    per_epoch = (volume + covered).reshape(rates.size, width)[:, :num_epochs]
+    series = flow_rate * per_epoch / epoch_length
+    return TrafficMatrix._from_owned(series.reshape(num_nodes, num_nodes, num_epochs))
+
+
 @renamed_arguments(val="value")
 def exact_tm(num_nodes: int, value: float, num_epochs: int = 1) -> TrafficMatrix:
     """

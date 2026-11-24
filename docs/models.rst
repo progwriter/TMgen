@@ -286,6 +286,32 @@ see the function's documentation. Mapping the rates to the node pairs of a
 topology, the paper's other step, needs link capacities and routing, which
 TMgen does not model.
 
+Flow-level traffic: shot noise
+------------------------------
+
+:py:func:`~tmgen.models.shot_noise_tm` builds a time series from flows, with
+the Poisson shot-noise model of Barakat et al. [#barakat2003]_. Each node pair
+receives flows as a Poisson process; a flow sends at a constant rate for a
+duration set by its size, which is heavy-tailed (Pareto). An entry is the
+total rate of the active flows, averaged over the epoch. The long-run mean of
+each pair is its entry in a matrix of means, from any other model, so the
+flow parameters only decide how bursty the series is: fewer and larger flows
+give larger swings around the same mean.
+
+>>> from tmgen.models import random_gravity_tm, shot_noise_tm
+>>> means = random_gravity_tm(num_nodes=4, total_traffic=40.0, normalize=True, rng=1)
+>>> tm = shot_noise_tm(
+...     means, num_epochs=100, epoch_length=10.0, mean_flow_size=20.0, flow_rate=2.0, rng=2
+... )
+>>> tm.shape
+(4, 4, 100)
+
+Rates are in volume units per second, and the matrix has no daily cycle; use
+:py:meth:`~tmgen.TrafficMatrix.modulate` for one. The flow-level traffic matrix
+generator for data centres of Han et al. (IFIP/IEEE IM 2015) builds on the
+same model with data centre specific parameters; its paper was not available
+to read, so only the underlying model is implemented here.
+
 Data centres: hot nodes and racks
 ---------------------------------
 
@@ -351,3 +377,8 @@ References
    synthetically generating IP traffic matrices: initial recommendations*. ACM
    SIGCOMM Computer Communication Review 35(3), July 2005.
    https://doi.org/10.1145/1070873.1070876
+
+.. [#barakat2003] Chadi Barakat, Patrick Thiran, Gianluca Iannaccone, Christophe
+   Diot and Philippe Owezarski. *Modeling Internet backbone traffic at the flow
+   level*. IEEE Transactions on Signal Processing 51(8), 2003.
+   https://doi.org/10.1109/TSP.2003.814521

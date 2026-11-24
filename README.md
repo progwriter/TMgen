@@ -38,6 +38,7 @@ tm.zero_diagonal().save("day.npz")
 | Modulated gravity | `modulated_gravity_tm` | Random gravity scaled over time by a daily cycle, with optional noise |
 | Non-stationary conditionally independent | `ncim_tm` | Each epoch drawn independently around known totals, optionally per node and time zone |
 | Traffic classes | `traffic_class_tm` | Gravity inside groups of nodes (such as access and peering), with set traffic between groups |
+| Flow-level shot noise | `shot_noise_tm` | Poisson flow arrivals per node pair around given mean rates, with tunable burstiness |
 | Data centre | `datacenter_tm` | Hot nodes and racks with a set share of cross-rack traffic |
 | Spike | `spike_tm` | A few large, randomly placed flows |
 | Elephants and mice | `elephants_and_mice_tm`, `fluctuating_tm` | Lognormal large flows and gamma small flows, with noise that grows with the mean |
