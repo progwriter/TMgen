@@ -14,6 +14,7 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 
 - `fourier_profile`: a cyclical profile built from Fourier components (eq. 8 of the paper).
 - `ncim_tm`: the paper's non-stationary conditionally independent model (eqs. 14 and 15), with optional per-node ingress and egress traffic and truncated-normal variance control.
+- `tmgen.metrics`: compare a synthetic series with a real one by marginal (`ks_distance`, `wasserstein_distance`), spatial (`singular_spectrum`, `gravity_error`, `heavy_hitter_share`, `spatial_comparison`) and temporal (`autocorrelation`, `temporal_comparison`) measures.
 - `tmgen.datasets.load_abilene`: download (once, checksum verified, cached) and load the real Abilene traffic matrices, 24 weeks of 12 x 12 matrices every 5 minutes.
 - `shot_noise_tm`: a flow-level series from a Poisson shot-noise process per node pair, with given mean rates and tunable burstiness (Barakat et al., 2003).
 - `elephants_and_mice_tm` and `fluctuating_tm`: mean rates with lognormal large flows and gamma small flows, and Gaussian fluctuations around them whose size follows a power law of the mean (Nucci et al., 2005).

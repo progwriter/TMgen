@@ -45,7 +45,8 @@ tm.zero_diagonal().save("day.npz")
 | Uniform, exponential, lognormal | `uniform_tm`, `exp_tm`, `lognormal_tm` | Independent random entries |
 | Exact | `exact_tm` | Every entry the same, for tests |
 
-To work from real traffic, `tmgen.datasets.load_abilene` downloads the public
+`tmgen.metrics` measures how close a generated series is to a real one. To work
+from real traffic, `tmgen.datasets.load_abilene` downloads the public
 Abilene matrices, and `tmgen.lowrank.LowRankModel` fits a low-rank model to a
 series of matrices and samples new ones.
 

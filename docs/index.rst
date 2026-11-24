@@ -56,6 +56,7 @@ Where to go next
    models
    lowrank
    datasets
+   metrics
    io
    sampling
    plotting

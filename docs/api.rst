@@ -15,6 +15,12 @@ Learning from measurements
 .. autoclass:: tmgen.lowrank.LowRankModel
   :members: fit, sample, num_nodes, rank
 
+Metrics
+-------
+
+.. automodule:: tmgen.metrics
+  :members:
+
 Datasets
 --------
 
