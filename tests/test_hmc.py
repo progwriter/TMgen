@@ -9,25 +9,6 @@ from tmgen.exceptions import TMgenException
 from tmgen.hmc import hmc_sample
 
 
-@pytest.mark.parametrize("covariance", [True, False])
-def test_hmc_truncated_gaussian(covariance: bool) -> None:
-    # standard 2d gaussian restricted to x >= 0 (f = I, g = 0)
-    numpy.random.seed(0)
-    xs = hmc_sample(
-        numpy.eye(2),
-        numpy.zeros(2),
-        numpy.eye(2),
-        numpy.zeros(2),
-        numpy.array([1.0, 1.0]),
-        3000,
-        covariance=covariance,
-    )
-    assert xs.shape == (2, 3000)
-    assert (xs > 0).all()
-    # mean of a half-normal is sqrt(2/pi)
-    assert xs.mean(axis=1) == pytest.approx(numpy.sqrt(2 / numpy.pi), abs=0.1)
-
-
 def _constrained_problem() -> tuple[NDArray[numpy.float64], ...]:
     gen = numpy.random.default_rng(0)
     d, m = 6, 14
@@ -54,7 +35,8 @@ def test_matvec_fallback_matches_gram(monkeypatch: pytest.MonkeyPatch) -> None:
     numpy.testing.assert_allclose(with_gram, without, atol=1e-6)
 
 
-def test_orthant_moments() -> None:
+@pytest.mark.parametrize("covariance", [True, False])
+def test_orthant_moments(covariance: bool) -> None:
     # half-normal in every coordinate: mean sqrt(2/pi), variance 1 - 2/pi
     xs = hmc_sample(
         numpy.eye(3),
@@ -64,7 +46,10 @@ def test_orthant_moments() -> None:
         numpy.ones(3),
         20000,
         rng=11,
+        covariance=covariance,
     )
+    assert xs.shape == (3, 20000)
+    assert (xs > 0).all()
     assert xs.mean(axis=1) == pytest.approx(numpy.sqrt(2 / numpy.pi), abs=0.03)
     assert xs.var(axis=1) == pytest.approx(1 - 2 / numpy.pi, abs=0.03)
 

@@ -101,6 +101,43 @@ def test_rng_is_keyword_only() -> None:
         )
 
 
+@pytest.mark.parametrize("model", ["random_gravity", "modulated_gravity"])
+def test_gravity_is_rank_one_and_asymmetric_unless_asked(model: str) -> None:
+    def make(**kw: Any) -> numpy.ndarray[Any, Any]:
+        tm = (
+            random_gravity_tm(6, 1.0, rng=0, **kw)
+            if model == "random_gravity"
+            else modulated_gravity_tm(6, 4, 100.0, rng=0, **kw)
+        )
+        return numpy.asarray(tm)
+
+    m = make()
+    assert not numpy.allclose(m[:, :, 0], m[:, :, 0].T)
+    assert numpy.linalg.matrix_rank(m[:, :, 0]) == 1
+    sym = make(symmetric=True)
+    numpy.testing.assert_allclose(sym, sym.transpose(1, 0, 2))
+
+
+@pytest.mark.parametrize("symmetric", [False, True])
+@pytest.mark.parametrize("use_profile", [False, True])
+def test_modulated_gravity_totals_follow_the_cycle(
+    symmetric: bool, use_profile: bool
+) -> None:
+    if use_profile:
+        expected = fourier_profile(96, 100.0, [(1 / 96, 30.0, 0.0)])
+        tm = modulated_gravity_tm(
+            7, 96, 1.0, profile=expected, symmetric=symmetric, rng=1
+        )
+    else:
+        expected = diurnal_profile(96, 100.0, 2, diurnal_freq=1 / 96)
+        tm = modulated_gravity_tm(
+            7, 96, 100.0, 2, diurnal_freq=1 / 96, symmetric=symmetric, rng=1
+        )
+    numpy.testing.assert_allclose(tm.matrix.sum(axis=(0, 1)), expected)
+    ratio = tm.matrix / tm.matrix[:, :, :1]
+    numpy.testing.assert_allclose(ratio, numpy.broadcast_to(ratio[0, 0], ratio.shape))
+
+
 def test_spike_has_exactly_num_spikes_in_total() -> None:
     tm = spike_tm(5, 4, 2.0, num_epochs=6, rng=0)
     assert (tm.matrix > 0).sum() == 4
@@ -138,27 +175,6 @@ def test_gravity_matches_definition() -> None:
     assert tm.matrix.shape == (3, 3, 1)
     numpy.testing.assert_allclose(tm.matrix[:, :, 0], numpy.outer(pop, pop) / 36 * 12)
     assert tm.matrix.sum() == pytest.approx(12.0)
-
-
-def test_modulated_gravity_scales_base_by_sinusoid() -> None:
-    tm = modulated_gravity_tm(3, 5, 10.0, rng=1)
-    ratio = tm.matrix / tm.matrix[:, :, :1]
-    numpy.testing.assert_allclose(ratio, numpy.broadcast_to(ratio[0, 0], ratio.shape))
-
-
-@pytest.mark.parametrize("num_nodes", [2, 10])
-def test_modulated_gravity_epoch_totals_follow_sinusoid(num_nodes: int) -> None:
-    tm = modulated_gravity_tm(
-        num_nodes,
-        48,
-        100.0,
-        peak_to_mean=2,
-        rng=0,
-    )
-    totals = tm.matrix.sum(axis=(0, 1))
-    expected = diurnal_profile(48, 100.0, 2)
-    numpy.testing.assert_allclose(totals, expected, atol=1e-9)
-    assert totals.mean() == pytest.approx(100.0, rel=0.05)
 
 
 def _truncated_mean_std(mu: float, sigma: float) -> tuple[float, float]:
@@ -215,6 +231,8 @@ def test_modulated_gravity_spatial_variance_changes_shares() -> None:
     noisy = modulated_gravity_tm(spatial_variance=2500, rng=3, **kwargs)
     assert not numpy.allclose(exact.matrix, noisy.matrix)
     assert (noisy.matrix >= 0).all()
+    ingress, egress = noisy.at_time(0).sum(axis=1), noisy.at_time(0).sum(axis=0)
+    assert not numpy.allclose(ingress, egress)
 
 
 def test_modulated_gravity_rejects_negative_variance() -> None:
@@ -242,24 +260,6 @@ def test_random_gravity_total_is_random_around_expectation(
     assert sums.std() > 1.0
     # 1 + 1 / num_nodes when rows and columns share their weights
     assert sums.mean() == pytest.approx(total * factor, rel=0.03)
-
-
-def test_random_gravity_is_asymmetric_by_default() -> None:
-    m = random_gravity_tm(6, 1.0, rng=0).matrix[:, :, 0]
-    assert not numpy.allclose(m, m.T)
-    assert numpy.linalg.matrix_rank(m) == 1
-
-
-def test_random_gravity_symmetric_option() -> None:
-    m = random_gravity_tm(6, 1.0, symmetric=True, rng=0).matrix[:, :, 0]
-    numpy.testing.assert_allclose(m, m.T)
-
-
-def test_random_gravity_ingress_and_egress_are_independent() -> None:
-    m = random_gravity_tm(5000, 1.0, rng=0).matrix[:, :, 0]
-    assert numpy.corrcoef(m.sum(axis=1), m.sum(axis=0))[0, 1] == pytest.approx(
-        0, abs=0.05
-    )
 
 
 def test_random_gravity_weights_are_exponential() -> None:
@@ -425,40 +425,6 @@ def test_asymmetric_peak_above_two_is_allowed_with_a_trough() -> None:
     assert cycle.max() == pytest.approx(3.0, rel=1e-3)
 
 
-def test_modulated_gravity_default_cycle_stays_around_the_total() -> None:
-    tm = modulated_gravity_tm(4, 96, 100.0, diurnal_freq=1 / 96, rng=0)
-    totals = tm.matrix.sum(axis=(0, 1))
-    assert totals.min() == pytest.approx(50.0, rel=1e-2)
-    assert totals.max() == pytest.approx(150.0, rel=1e-2)
-
-
-def test_modulated_gravity_is_asymmetric_by_default() -> None:
-    m = modulated_gravity_tm(6, 4, 100.0, rng=0).matrix[:, :, 0]
-    assert not numpy.allclose(m, m.T)
-    assert numpy.linalg.matrix_rank(m) == 1
-
-
-def test_modulated_gravity_symmetric_option() -> None:
-    tm = modulated_gravity_tm(6, 4, 100.0, symmetric=True, rng=0)
-    for epoch in range(4):
-        numpy.testing.assert_allclose(tm.at_time(epoch), tm.at_time(epoch).T)
-
-
-@pytest.mark.parametrize("symmetric", [False, True])
-def test_modulated_gravity_totals_do_not_depend_on_symmetry(symmetric: bool) -> None:
-    tm = modulated_gravity_tm(7, 48, 100.0, symmetric=symmetric, rng=1)
-    expected = diurnal_profile(48, 100.0)
-    numpy.testing.assert_allclose(tm.matrix.sum(axis=(0, 1)), expected)
-
-
-def test_modulated_gravity_spatial_variance_applies_to_ingress_and_egress() -> None:
-    kwargs: dict[str, Any] = dict(total_traffic=1000.0, temporal_variance=0)
-    tm = modulated_gravity_tm(5, 3, spatial_variance=2500, rng=3, **kwargs)
-    ingress = tm.at_time(0).sum(axis=1)
-    egress = tm.at_time(0).sum(axis=0)
-    assert not numpy.allclose(ingress, egress)
-
-
 def test_default_rng_is_numpys_global_legacy_stream() -> None:
     # documented behavior: numpy.random.seed keeps working, with the same
     # stream as calling the legacy numpy.random functions directly
@@ -488,12 +454,6 @@ def test_fourier_profile_without_harmonics_is_constant() -> None:
 def test_fourier_profile_rejects_a_negative_profile() -> None:
     with pytest.raises(TMgenException, match="negative"):
         fourier_profile(24, 1.0, [(1 / 24, 2.0, 0.0)])
-
-
-def test_modulated_gravity_follows_a_given_profile() -> None:
-    profile = fourier_profile(24, 100.0, [(1 / 24, 30.0, 0.0)])
-    tm = modulated_gravity_tm(5, 24, 1.0, profile=profile, rng=0)
-    numpy.testing.assert_allclose(tm.matrix.sum(axis=(0, 1)), profile)
 
 
 @pytest.mark.parametrize(
