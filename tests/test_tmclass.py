@@ -323,3 +323,29 @@ def test_constructor_and_at_time_accept_the_old_keywords() -> None:
     with pytest.warns(DeprecationWarning, match="'t' is deprecated, use 'epoch'"):
         numpy.testing.assert_array_equal(tm.at_time(t=1), tm.at_time(1))  # type: ignore[call-arg]
     numpy.testing.assert_array_equal(tm.at_time(-1), tm.at_time(1))
+
+
+def test_add_rejects_different_epoch_counts() -> None:
+    with pytest.raises(TMgenException):
+        TrafficMatrix(numpy.ones((2, 2, 3))) + TrafficMatrix(numpy.ones((2, 2, 4)))
+
+
+@pytest.mark.parametrize(
+    ("agg", "expected"), [("min", 1.0), ("max", 5.0), ("mean", 3.0)]
+)
+def test_between_aggregates_over_the_epochs(agg: str, expected: float) -> None:
+    matrix = numpy.zeros((2, 2, 3))
+    matrix[0, 1] = [1.0, 3.0, 5.0]
+    tm = TrafficMatrix(matrix)
+    assert tm.between(0, 1, agg) == expected  # type: ignore[call-overload]
+    with pytest.raises(TMgenException):
+        tm.between(0, 1, "median")  # type: ignore[call-overload]
+
+
+def test_zero_diagonal_clears_every_epoch_and_keeps_the_original() -> None:
+    tm = TrafficMatrix(numpy.ones((3, 3, 2)))
+    cleared = tm.zero_diagonal()
+    assert cleared.matrix.sum() == 12
+    for epoch in range(2):
+        assert not numpy.diag(cleared.at_time(epoch)).any()
+    assert tm.matrix.sum() == 18

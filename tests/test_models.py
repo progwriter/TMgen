@@ -816,3 +816,10 @@ def test_all_lists_every_public_function() -> None:
         and not name.startswith("_")
     }
     assert public <= set(models.__all__)
+
+
+def test_shot_noise_is_stationary_from_the_first_epoch() -> None:
+    means = TrafficMatrix(numpy.full((30, 30, 1), 4.0))
+    tm = shot_noise_tm(means, 6, epoch_length=2.0, rng=0, **_SHOT)
+    per_epoch = tm.matrix.mean(axis=(0, 1))
+    assert per_epoch[0] == pytest.approx(per_epoch[-1], rel=0.1)

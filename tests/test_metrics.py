@@ -178,3 +178,12 @@ def test_comparison_validates() -> None:
         spatial_comparison(TrafficMatrix(numpy.zeros((3, 3, 40))), a)
     with pytest.raises(TMgenException, match="too short"):
         temporal_comparison(exp_tm(3, 1.0, num_epochs=3), a)
+
+
+def test_temporal_variability_is_the_gap_between_coefficients_of_variation() -> None:
+    flat = TrafficMatrix(numpy.ones((3, 3, 48)))
+    cycle = modulated_gravity_tm(3, 48, 9.0, diurnal_freq=1 / 24, rng=0)
+    totals = cycle.matrix.sum(axis=(0, 1))
+    gap = temporal_comparison(flat, cycle)["variability"]
+    assert gap == pytest.approx(totals.std() / totals.mean())
+    assert gap > 0
