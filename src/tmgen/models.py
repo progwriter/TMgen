@@ -1098,7 +1098,7 @@ def shot_noise_tm(
     fill -= numpy.bincount(index["fill"] + last[split], whole, size_out)
     covered = numpy.cumsum(fill.reshape(rates.size, width), axis=1).ravel()
     per_epoch = (volume + covered).reshape(rates.size, width)[:, :num_epochs]
-    series = flow_rate * per_epoch / epoch_length
+    series = numpy.asarray(flow_rate * per_epoch / epoch_length, dtype=numpy.float64)
     return TrafficMatrix._from_owned(series.reshape(num_nodes, num_nodes, num_epochs))
 
 

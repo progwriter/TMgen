@@ -116,6 +116,7 @@ def _fetch(url: str, destination: Path, sha256: str) -> None:
     """Download *url* to *destination*, keeping nothing unless the checksum matches."""
     destination.parent.mkdir(parents=True, exist_ok=True)
     digest = hashlib.sha256()
+    failure: Exception | None = None
     with tempfile.NamedTemporaryFile(
         dir=destination.parent, prefix=destination.name, delete=False
     ) as partial:
@@ -125,8 +126,11 @@ def _fetch(url: str, destination: Path, sha256: str) -> None:
                     digest.update(block)
                     partial.write(block)
         except (urllib.error.URLError, OSError) as error:
-            Path(partial.name).unlink(missing_ok=True)
-            raise TMgenException(f"could not download {url}: {error}") from error
+            failure = error
+    # Windows cannot delete a file that is still open
+    if failure is not None:
+        Path(partial.name).unlink(missing_ok=True)
+        raise TMgenException(f"could not download {url}: {failure}") from failure
     if digest.hexdigest() != sha256:
         Path(partial.name).unlink(missing_ok=True)
         raise TMgenException(
