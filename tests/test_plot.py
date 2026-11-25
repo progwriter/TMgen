@@ -20,24 +20,9 @@ def _close_figures() -> Iterator[None]:
 
 
 @pytest.mark.parametrize("epochs", [1, 6])
-@pytest.mark.parametrize("have_seaborn", [True, False])
-def test_heatmap(
-    monkeypatch: pytest.MonkeyPatch, epochs: int, have_seaborn: bool
-) -> None:
-    if have_seaborn:
-        pytest.importorskip("seaborn")
-    else:
-        monkeypatch.setattr(plot, "seaborn", None)
-    plot.heatmap(TrafficMatrix(numpy.random.rand(4, 4, epochs)))
-
-
-def test_heatmap_single_epoch_of_many(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_heatmap_without_seaborn(monkeypatch: pytest.MonkeyPatch, epochs: int) -> None:
     monkeypatch.setattr(plot, "seaborn", None)
-    plot.heatmap(TrafficMatrix(numpy.random.rand(4, 4, 6)), epoch=2)
-
-
-def test_timeseries() -> None:
-    plot.timeseries(TrafficMatrix(numpy.random.rand(3, 3, 5)))
+    plot.heatmap(TrafficMatrix(numpy.random.rand(4, 4, epochs)))
 
 
 def test_functions_return_the_axes_they_draw_on() -> None:

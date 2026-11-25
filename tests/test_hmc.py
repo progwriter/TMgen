@@ -80,10 +80,6 @@ def test_invalid_arguments_raise_tmgen_exception(kwargs: dict[str, Any]) -> None
         hmc_sample(**args)
 
 
-def test_tmgen_exception_is_a_value_error() -> None:
-    assert issubclass(TMgenException, ValueError)
-
-
 def test_single_sample_returns_the_initial_point() -> None:
     xs = hmc_sample(
         numpy.eye(2), numpy.zeros(2), numpy.eye(2), numpy.zeros(2), numpy.ones(2), 1

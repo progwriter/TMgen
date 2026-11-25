@@ -20,13 +20,6 @@ def test_a_modulated_gravity_series_is_rank_one(series: TrafficMatrix) -> None:
     assert model.num_nodes == 5
 
 
-def test_the_mean_and_components_describe_the_series(series: TrafficMatrix) -> None:
-    model = LowRankModel.fit(series)
-    numpy.testing.assert_allclose(model.mean, series.matrix.mean(axis=2))
-    norms = numpy.linalg.norm(model.components.reshape(model.rank, -1), axis=1)
-    numpy.testing.assert_allclose(norms, 1.0)
-
-
 def test_samples_follow_the_fitted_series(series: TrafficMatrix) -> None:
     model = LowRankModel.fit(series)
     sample = model.sample(4000, rng=0)

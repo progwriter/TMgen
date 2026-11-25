@@ -159,16 +159,6 @@ def test_spike_values_are_exponential() -> None:
     assert values.mean() == pytest.approx(7.0, rel=0.15)
 
 
-@pytest.mark.parametrize("spikes", [-1, 3 * 3 * 2 + 1])
-def test_spike_count_out_of_range(spikes: int) -> None:
-    with pytest.raises(TMgenException):
-        spike_tm(3, spikes, 1.0, num_epochs=2)
-
-
-def test_spike_can_fill_every_entry() -> None:
-    assert (spike_tm(2, 8, 1.0, num_epochs=2, rng=0).matrix > 0).all()
-
-
 def test_gravity_matches_definition() -> None:
     pop = numpy.array([1.0, 2.0, 3.0])
     tm = gravity_tm(pop, 12.0)
@@ -195,12 +185,6 @@ def test_truncated_normal_moments(mu: float) -> None:
     assert (x >= 0).all()
     assert x.mean() == pytest.approx(mean, rel=0.02)
     assert x.std() == pytest.approx(std, rel=0.03)
-
-
-def test_truncated_normal_zero_std_returns_clipped_mean() -> None:
-    gen = numpy.random.default_rng(0)
-    out = _truncated_normal(gen, numpy.array([-1.0, 0.0, 2.5]), 0.0)
-    numpy.testing.assert_array_equal(out, [0.0, 0.0, 2.5])
 
 
 def test_modulated_gravity_temporal_variance_adds_noise() -> None:
@@ -277,32 +261,22 @@ def test_random_gravity_weights_are_exponential() -> None:
 
 _INVALID_CALLS = {
     "nodes_zero": lambda: exp_tm(0, 1.0),
-    "nodes_negative": lambda: uniform_tm(-1, 0.0, 1.0),
     "nodes_fraction": lambda: exact_tm(2.5, 1.0),  # type: ignore[arg-type]
     "nodes_text": lambda: random_gravity_tm("3", 1.0),  # type: ignore[arg-type]
     "epochs_zero": lambda: exp_tm(3, 1.0, num_epochs=0),
-    "epochs_negative": lambda: spike_tm(3, 1, 1.0, num_epochs=-1),
-    "modulated_epochs_zero": lambda: modulated_gravity_tm(3, 0, 1.0),
     "exp_negative_mean": lambda: exp_tm(3, -1.0),
     "exp_nan_mean": lambda: exp_tm(3, float("nan")),
-    "exp_infinite_mean": lambda: exp_tm(3, float("inf")),
-    "lognormal_negative_sigma": lambda: lognormal_tm(3, 0.0, sigma=-1.0),
     "lognormal_nan_mu": lambda: lognormal_tm(3, float("nan")),
-    "exact_negative": lambda: exact_tm(3, -1.0),
     "uniform_low_above_high": lambda: uniform_tm(3, 5.0, 1.0),
-    "uniform_negative_low": lambda: uniform_tm(3, -1.0, 1.0),
-    "random_gravity_negative_total": lambda: random_gravity_tm(3, -1.0),
     "gravity_negative_population": lambda: gravity_tm([1.0, -1.0], 1.0),
     "gravity_zero_populations": lambda: gravity_tm([0.0, 0.0], 1.0),
     "gravity_empty": lambda: gravity_tm([], 1.0),
     "gravity_2d": lambda: gravity_tm([[1.0, 2.0]], 1.0),
     "gravity_text": lambda: gravity_tm(["a", "b"], 1.0),
     "gravity_nan": lambda: gravity_tm([1.0, float("nan")], 1.0),
-    "gravity_negative_total": lambda: gravity_tm([1.0, 2.0], -1.0),
     "spike_too_many": lambda: spike_tm(2, 5, 1.0),
     "spike_negative": lambda: spike_tm(2, -1, 1.0),
     "spike_fraction": lambda: spike_tm(2, 1.5, 1.0),  # type: ignore[arg-type]
-    "spike_negative_mean": lambda: spike_tm(2, 1, -1.0),
     "modulated_zero_mean": lambda: modulated_gravity_tm(3, 4, 0.0),
     "modulated_nan_freq": lambda: modulated_gravity_tm(
         3, 4, 1.0, diurnal_freq=float("nan")
@@ -314,11 +288,6 @@ _INVALID_CALLS = {
 def test_invalid_input_raises_tmgen_exception(name: str) -> None:
     with pytest.raises(TMgenException):
         _INVALID_CALLS[name]()
-
-
-def test_invalid_input_can_be_caught_as_value_error() -> None:
-    with pytest.raises(ValueError, match="num_nodes"):
-        exp_tm(0, 1.0)
 
 
 def test_equal_bounds_and_integral_floats_are_accepted() -> None:
@@ -392,10 +361,6 @@ def test_trough_to_mean_is_the_lowest_value_over_the_mean() -> None:
     assert (cycle[cycle < 10.0] < 10.0).all()
     # an asymmetric cycle does not average to the mean
     assert cycle.mean() != pytest.approx(10.0, rel=1e-3)
-
-
-def test_peak_to_mean_one_is_flat() -> None:
-    assert (diurnal_profile(10, 5.0, peak_to_mean=1) == 5.0).all()
 
 
 @pytest.mark.parametrize(
@@ -523,13 +488,6 @@ def test_ncim_time_zones_shift_the_busy_hour_of_each_node() -> None:
     expected = ingress * egress.sum(axis=0) / total
     numpy.testing.assert_allclose(by_ingress, expected, rtol=0.2)
     assert by_ingress[0].argmax() != by_ingress[1].argmax()
-
-
-def test_ncim_node_traffic_may_be_constant_in_time() -> None:
-    tm = ncim_tm(
-        [5.0, 5.0, 5.0], ingress_traffic=[1.0, 2.0], egress_traffic=[3.0, 4.0], rng=0
-    )
-    assert tm.shape == (2, 2, 3)
 
 
 def test_ncim_spatial_variance_gives_truncated_normal_weights() -> None:

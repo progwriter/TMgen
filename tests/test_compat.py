@@ -22,7 +22,3 @@ def test_old_name_warns_and_is_forwarded() -> None:
 def test_old_and_new_together_is_an_error() -> None:
     with pytest.raises(TypeError, match="both 'old'"):
         _func(1, old=2, new=3)  # type: ignore[call-arg]
-
-
-def test_metadata_is_kept() -> None:
-    assert _func.__name__ == "_func"

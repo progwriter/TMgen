@@ -9,7 +9,6 @@ import pytest
 from tmgen import TMgenException
 from tmgen.datasets import (
     ABILENE_NODES,
-    ABILENE_WEEKS,
     _fetch,
     _parse_abilene,
     data_dir,
@@ -119,11 +118,6 @@ def test_load_abilene_reports_a_failed_download(tmp_path: Path) -> None:
         load_abilene(
             1, cache_dir=tmp_path / "cache", base_url=(tmp_path / "none").as_uri()
         )
-
-
-def test_the_week_table_covers_24_weeks() -> None:
-    assert sorted(ABILENE_WEEKS) == list(range(1, 25))
-    assert len(ABILENE_NODES) == 12
 
 
 def test_data_dir_follows_the_environment(

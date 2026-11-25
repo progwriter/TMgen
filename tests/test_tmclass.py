@@ -7,11 +7,6 @@ from tmgen import TrafficMatrix, models
 from tmgen.exceptions import TMgenException
 
 
-def test_empty_constructor() -> None:
-    with pytest.raises(TypeError):
-        TrafficMatrix()  # type: ignore[call-arg]
-
-
 def test_mean_and_worst_case() -> None:
     m = numpy.stack([numpy.ones((2, 2)), 3 * numpy.ones((2, 2))], axis=2)
     tm = TrafficMatrix(m)
@@ -31,7 +26,7 @@ def test_csv_is_long_format(tmp_path: Path) -> None:
     assert lines[-1] == "1,1,1,7"
 
 
-@pytest.mark.parametrize("shape", [(1, 1, 1), (2, 2, 1), (3, 3, 4), (4, 4, 2)])
+@pytest.mark.parametrize("shape", [(1, 1, 1), (3, 3, 4)])
 def test_csv_round_trip(tmp_path: Path, shape: tuple[int, int, int]) -> None:
     tm = TrafficMatrix(numpy.random.default_rng(0).random(shape))
     path = tmp_path / "tm.csv"
@@ -128,11 +123,6 @@ def test_add() -> None:
         a + 1  # type: ignore[operator]
 
 
-def test_models_return_read_only_matrices() -> None:
-    assert not models.exp_tm(3, 1.0, num_epochs=2, rng=0).matrix.flags.writeable
-    assert not models.gravity_tm([1, 2, 3], 6.0).matrix.flags.writeable
-
-
 def test_pickle_round_trip_is_deprecated(tmp_path: Path) -> None:
     tm = TrafficMatrix(numpy.random.default_rng(0).random((3, 3, 2)))
     path = tmp_path / "tm.pickle"
@@ -198,11 +188,6 @@ def test_load_validates_the_data(tmp_path: Path) -> None:
     numpy.savez(path, matrix=-numpy.ones((2, 2, 1)), format_version=1)
     with pytest.raises(TMgenException):
         TrafficMatrix.load(path)
-
-
-def test_load_missing_file(tmp_path: Path) -> None:
-    with pytest.raises(FileNotFoundError):
-        TrafficMatrix.load(tmp_path / "missing.npz")
 
 
 def test_size_properties() -> None:

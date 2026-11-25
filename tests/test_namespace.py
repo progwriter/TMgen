@@ -6,18 +6,16 @@ import pytest
 import tmgen
 
 
-@pytest.mark.parametrize("name", tmgen.__all__)
-def test_public_name_exists(name: str) -> None:
-    if name == "plot":
-        pytest.importorskip("matplotlib")  # an optional dependency
-    assert getattr(tmgen, name) is not None
-
-
 def test_top_level_exports() -> None:
     assert issubclass(tmgen.TMgenException, ValueError)
     assert callable(tmgen.hmc.hmc_sample)
     assert callable(tmgen.models.exp_tm)
     assert isinstance(tmgen.__version__, str)
+    for name in tmgen.__all__:
+        if name != "plot":  # an optional dependency
+            assert getattr(tmgen, name) is not None
+    pytest.importorskip("matplotlib")
+    assert tmgen.plot.heatmap is not None
 
 
 def test_unknown_attribute() -> None:
@@ -31,11 +29,6 @@ def test_plot_is_not_imported_with_the_package() -> None:
         [sys.executable, "-c", code], capture_output=True, text=True, check=True
     )
     assert out.stdout.strip() == "False"
-
-
-def test_plot_is_available_on_demand() -> None:
-    pytest.importorskip("matplotlib")
-    assert tmgen.plot.heatmap is not None
 
 
 def test_dir_lists_only_the_public_names() -> None:
