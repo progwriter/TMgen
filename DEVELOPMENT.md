@@ -35,7 +35,8 @@ built. CI runs the same hooks.
 
 ## Layout
 
-- `src/tmgen/tm.py`, `models.py`, `plot.py`, `inject/`: plain Python (NumPy).
+- `src/tmgen/tm.py`, `models.py`, `lowrank.py`, `metrics.py`, `datasets.py`,
+  `plot.py`, `inject/`: plain Python (NumPy).
 - `src/tmgen/hmc.pyx`: the only compiled module. Ruff and mypy cannot see
   `.pyx` files, so when you change its signature, update `hmc.pyi` by hand.
 - `tests/`, `docs/`, `tools/` (release helpers).
@@ -55,6 +56,10 @@ The pre-commit hooks cover everything above except `pytest`. Notes:
 
 - Ruff sorts imports differently depending on whether the extensions are
   built, so run it after `pip install -e ".[dev]"`, as CI does.
+- mypy's result depends on the NumPy version: Python 3.11 resolves an older
+  NumPy than 3.12 and later, whose stubs infer different types (for example
+  `float * ndarray`). Run `mypy` on 3.11 as well as your default Python, and
+  annotate such results explicitly instead of relying on `type: ignore`.
 - Tests and doctests run in a temporary directory (`conftest.py`), so they
   can write files freely.
 - One test downloads a real Abilene week (7 MB) from the dataset's host; it is

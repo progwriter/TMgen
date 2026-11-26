@@ -2,38 +2,12 @@
 
 TMgen generates network traffic matrices. Python 3.11+, with one Cython extension (`hmc`).
 
-## Layout
+## Layout, setup and checks
 
-- `src/tmgen/tm.py`, `models.py`, `plot.py`, `inject/`: pure Python (NumPy).
-- `src/tmgen/hmc.pyx`: the only compiled module; `hmc.pyi` (typed API) is hand-written. No `.pxd` files are shipped: the compiled module is not a cimport API.
-- `tests/`, `docs/` (Sphinx; `docs/quickstart.rst` doctests run under pytest), `tools/` (release helpers, type-checked and tested).
+See [DEVELOPMENT.md](DEVELOPMENT.md) for the layout, setup, the checks CI runs (`ruff check`, `ruff format --check`, `mypy`, `pytest`, the pre-commit hooks and a strict Sphinx build) and their gotchas. Every commit should pass them; run `mypy` on Python 3.11 as well as your default Python. Do not duplicate that content here.
+
 - `agentdocs/` (git-ignored): local notes such as `PLAN.md` and `API_CRITIQUE.md`. Never commit them. Keep `agentdocs/PLAN.md` current as work lands.
-
-## Setup and checks
-
-`DEVELOPMENT.md` is the human-facing version of this section and the commit rules; keep them consistent.
-
-```
-uv venv && uv pip install -e '.[dev]'
-uv pip install -e .   # rebuild after editing hmc.pyx
-```
-
-CI runs these (plus the pre-commit hooks in `.pre-commit-config.yaml`, which add whitespace checks and a strict Sphinx build, `python -m sphinx -W -b html docs docs/_build`), and every commit should pass them:
-
-```
-ruff check
-ruff format --check
-mypy
-pytest            # tests + docs doctests, each in a temp dir (conftest.py)
-```
-
-CI also builds the docs strictly in a `docs` job and measures coverage (`pytest --cov`, threshold in `pyproject.toml`) on one test leg.
-
-Gotchas:
-
-- Ruff's import sorting depends on whether the extension is built, so run `ruff check` after building.
-- mypy's result depends on the NumPy version: Python 3.11 resolves an older NumPy than 3.12+, whose stubs infer different types (for example `float * ndarray`). Run `mypy` on 3.11 as well as your default Python before pushing, or annotate such results explicitly instead of relying on `type: ignore`.
-- Ruff and mypy do not see `.pyx` files. When `hmc.pyx`'s signature changes, update `hmc.pyi` by hand.
+- Ruff and mypy do not see `hmc.pyx`: update `hmc.pyi` by hand when its signature changes.
 
 ## Code style
 
