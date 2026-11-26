@@ -25,7 +25,8 @@ Datasets
 --------
 
 .. automodule:: tmgen.datasets
-  :members: load_abilene, data_dir, ABILENE_NODES, ABILENE_WEEKS, ABILENE_URL
+  :members: load_abilene, load_geant, data_dir, ABILENE_NODES, ABILENE_WEEKS,
+    ABILENE_URL, GEANT_NODES, GEANT_WEEKS, GEANT_URL
 
 TrafficMatrix
 -------------

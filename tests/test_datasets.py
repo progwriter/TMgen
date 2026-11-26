@@ -1,6 +1,8 @@
 import gzip
 import hashlib
+import io
 import os
+import tarfile
 from pathlib import Path
 
 import numpy
@@ -9,10 +11,12 @@ import pytest
 from tmgen import TMgenException
 from tmgen.datasets import (
     ABILENE_NODES,
+    GEANT_NODES,
     _fetch,
     _parse_abilene,
     data_dir,
     load_abilene,
+    load_geant,
 )
 
 PAIRS = len(ABILENE_NODES) ** 2
@@ -134,4 +138,98 @@ def test_data_dir_follows_the_environment(
 def test_load_abilene_downloads_the_real_week(tmp_path: Path) -> None:
     tm = load_abilene(1, cache_dir=tmp_path)
     assert tm.shape == (12, 12, 2016)
+    assert tm.matrix.sum(axis=(0, 1)).mean() > 1e8
+
+
+def _geant_xml(entries: dict[tuple[int, int], float]) -> bytes:
+    sources = []
+    for src in sorted({i for i, _ in entries}):
+        dsts = "".join(
+            f'<dst id="{j}">{v}</dst>' for (i, j), v in entries.items() if i == src
+        )
+        sources.append(f'<src id="{src}">{dsts}</src>')
+    return (
+        "<TrafficMatrixFile><IntraTM ASID='1'>" + "".join(sources) + "</IntraTM>"
+        "</TrafficMatrixFile>"
+    ).encode()
+
+
+def _geant_archive(path: Path, files: dict[str, bytes]) -> None:
+    with tarfile.open(path, "w:bz2") as archive:
+        for name, content in files.items():
+            info = tarfile.TarInfo(f"traffic-matrices/{name}")
+            info.size = len(content)
+            archive.addfile(info, io.BytesIO(content))
+
+
+_OFFLINE = "file:///nonexistent"
+
+
+def test_geant_matrices_are_in_bytes_per_second_and_in_time_order(
+    tmp_path: Path,
+) -> None:
+    _geant_archive(
+        tmp_path / "geant-traffic-matrices.tar.bz2",
+        {
+            "IntraTM-2005-01-08-00-15.xml": _geant_xml({(1, 2): 8.0}),
+            "IntraTM-2005-01-02-00-45.xml": _geant_xml({(23, 1): 16.0}),
+            "IntraTM-2005-01-02-00-30.xml": _geant_xml({(1, 2): 8.0, (2, 2): 0.8}),
+            "other.txt": b"ignored",
+        },
+    )
+    week1 = load_geant(1, cache_dir=tmp_path, url=_OFFLINE)
+    assert week1.shape == (23, 23, 2)
+    # 1 kbps is 125 bytes per second; absent entries are zero
+    assert week1.matrix[0, 1, 0] == pytest.approx(1000.0)
+    assert week1.matrix[1, 1, 0] == pytest.approx(100.0)
+    assert week1.matrix[22, 0, 1] == pytest.approx(2000.0)
+    assert week1.matrix[0, 1, 1] == 0
+    both = load_geant([2, 1], cache_dir=tmp_path, url=_OFFLINE)
+    assert both.shape == (23, 23, 3)
+    assert both.matrix[0, 1, 0] == pytest.approx(1000.0)
+    assert both.matrix[22, 0, 2] == pytest.approx(2000.0)
+    assert len(GEANT_NODES) == 23
+
+
+@pytest.mark.parametrize("weeks", [[], 0, 18, [1, 99]])
+def test_geant_rejects_unknown_weeks(tmp_path: Path, weeks: object) -> None:
+    with pytest.raises(TMgenException):
+        load_geant(weeks, cache_dir=tmp_path, url=_OFFLINE)  # type: ignore[arg-type]
+
+
+def test_geant_reports_a_week_without_data(tmp_path: Path) -> None:
+    _geant_archive(
+        tmp_path / "geant-traffic-matrices.tar.bz2",
+        {"IntraTM-2005-01-02-00-30.xml": _geant_xml({(1, 2): 1.0})},
+    )
+    with pytest.raises(TMgenException, match="week 5"):
+        load_geant(5, cache_dir=tmp_path, url=_OFFLINE)
+
+
+@pytest.mark.parametrize(
+    "content", [b"not xml", _geant_xml({(1, 24): 1.0}), _geant_xml({(0, 1): 1.0})]
+)
+def test_geant_rejects_bad_files(tmp_path: Path, content: bytes) -> None:
+    _geant_archive(
+        tmp_path / "geant-traffic-matrices.tar.bz2",
+        {"IntraTM-2005-01-02-00-30.xml": content},
+    )
+    with pytest.raises(TMgenException, match="not a GEANT archive"):
+        load_geant(1, cache_dir=tmp_path, url=_OFFLINE)
+
+
+def test_geant_rejects_a_file_that_is_not_an_archive(tmp_path: Path) -> None:
+    (tmp_path / "geant-traffic-matrices.tar.bz2").write_bytes(b"plain")
+    with pytest.raises(TMgenException):
+        load_geant(1, cache_dir=tmp_path, url=_OFFLINE)
+
+
+@pytest.mark.skipif(
+    not os.environ.get("TMGEN_NETWORK_TESTS"),
+    reason="downloads 18 MB; set TMGEN_NETWORK_TESTS=1 to run",
+)
+def test_load_geant_downloads_the_real_archive(tmp_path: Path) -> None:
+    tm = load_geant(2, cache_dir=tmp_path)
+    assert tm.num_nodes == 23
+    assert 600 < tm.num_epochs <= 672
     assert tm.matrix.sum(axis=(0, 1)).mean() > 1e8

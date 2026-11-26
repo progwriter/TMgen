@@ -6,17 +6,22 @@ disk; nothing is bundled with TMgen. The cache directory is
 ``$TMGEN_DATA_DIR`` if set, else ``~/.cache/tmgen``.
 """
 
+import datetime
 import gzip
 import hashlib
 import logging
 import os
+import re
 import shutil
+import tarfile
 import tempfile
 import urllib.error
 import urllib.request
 import warnings
+import xml.etree.ElementTree as ElementTree
 from collections.abc import Sequence
 from pathlib import Path
+from typing import IO
 
 import numpy
 from numpy.typing import NDArray
@@ -206,3 +211,125 @@ def load_abilene(
             _fetch(f"{base_url}/X{week:02d}.gz", raw, _ABILENE_SHA256[week])
         parts.append(_parse_abilene(raw))
     return TrafficMatrix(numpy.concatenate(parts, axis=2))
+
+
+GEANT_URL = (
+    "https://totem.run.montefiore.uliege.be/files/data/"
+    "traffic-matrices-anonymized-v2.tar.bz2"
+)
+"""Where the GEANT archive is downloaded from (the TOTEM project's page)."""
+
+GEANT_NODES = tuple(range(1, 24))
+"""The 23 nodes of the GEANT matrices: their anonymised router ids, in row and
+column order."""
+
+GEANT_WEEKS = range(1, 18)
+"""The 17 weeks of GEANT data. Week 1 starts on 2005-01-01 (a date the dataset
+anonymises, so only differences between dates mean something)."""
+
+_GEANT_SHA256 = "1d0551f6db9ae8d0f2fb109803f2bfe7ecc2c2f08e6fe0d7891e5c6db602261d"
+_GEANT_FILE = re.compile(r"(?:^|/)IntraTM-(\d{4})-(\d\d)-(\d\d)-(\d\d)-(\d\d)\.xml$")
+_GEANT_START = datetime.datetime(2005, 1, 1)
+_GEANT_BYTES_PER_SECOND_PER_KBPS = 1000 / 8
+
+
+def _geant_matrix(source: IO[bytes]) -> NDArray[numpy.float64]:
+    """Parse one matrix file; entries that are absent carried no traffic."""
+    size = len(GEANT_NODES)
+    matrix = numpy.zeros((size, size))
+    root = ElementTree.parse(source).getroot()
+    for src in root.iterfind("IntraTM/src"):
+        row = int(src.attrib["id"]) - 1
+        for dst in src.iterfind("dst"):
+            column = int(dst.attrib["id"]) - 1
+            if not (0 <= row < size and 0 <= column < size) or not dst.text:
+                raise ValueError(
+                    f"unexpected node ids {src.attrib['id']}, {dst.attrib}"
+                )
+            matrix[row, column] = float(dst.text)
+    return matrix * _GEANT_BYTES_PER_SECOND_PER_KBPS
+
+
+def _parse_geant(
+    path: Path, weeks: Sequence[int]
+) -> dict[int, list[NDArray[numpy.float64]]]:
+    """The matrices of the given weeks, each week in time order."""
+    found: dict[int, list[tuple[datetime.datetime, NDArray[numpy.float64]]]] = {
+        week: [] for week in weeks
+    }
+    try:
+        with tarfile.open(path, "r:bz2") as archive:
+            for member in archive:
+                name = _GEANT_FILE.search(member.name)
+                if name is None or not member.isfile():
+                    continue
+                year, month, day, hour, minute = (int(part) for part in name.groups())
+                when = datetime.datetime(year, month, day, hour, minute)
+                week = (when - _GEANT_START).days // 7 + 1
+                if week in found:
+                    source = archive.extractfile(member)
+                    assert source is not None
+                    found[week].append((when, _geant_matrix(source)))
+    except (
+        tarfile.TarError,
+        OSError,
+        EOFError,
+        ElementTree.ParseError,
+        ValueError,
+        KeyError,
+    ) as error:
+        raise TMgenException(f"{path} is not a GEANT archive: {error}") from error
+    return {
+        week: [matrix for _, matrix in sorted(items, key=lambda item: item[0])]
+        for week, items in found.items()
+    }
+
+
+def load_geant(
+    weeks: int | Sequence[int] = 1,
+    *,
+    cache_dir: str | os.PathLike[str] | None = None,
+    url: str = GEANT_URL,
+) -> TrafficMatrix:
+    """
+    Load real traffic matrices of the GEANT backbone network, built by Uhlig
+    et al. from NetFlow, BGP and IGP routing data, from 2005-01-01 to
+    2005-04-29.
+
+    There are 17 weeks (see :py:data:`GEANT_WEEKS`) of 23 nodes
+    (:py:data:`GEANT_NODES`), one matrix every 15 minutes. The whole archive
+    (18 MB) is downloaded on first use, checked against a checksum and cached;
+    reading it takes a few seconds whichever week you ask for.
+
+    Some matrices are missing from the original data (a few hours here and
+    there, and a gap of almost five days in March). They are skipped, not
+    filled in, so consecutive epochs are not always 15 minutes apart. Absent
+    entries in the files are taken as no traffic.
+
+    :param weeks: the week number (1 to 17) or a sequence of them, joined in the
+        order given
+    :param cache_dir: where to keep the download; default :py:func:`data_dir`
+    :param url: where to download from
+    :return: a new :py:class:`~tmgen.TrafficMatrix` in bytes per second
+        (the files give kilobits per second)
+    :raises TMgenException: for an unknown week or one without data, a failed
+        download or a file that does not match its checksum
+    """
+    requested = [weeks] if isinstance(weeks, int) else list(weeks)
+    if not requested:
+        raise TMgenException("weeks must not be empty")
+    for week in requested:
+        if week not in GEANT_WEEKS:
+            raise TMgenException(f"weeks must be between 1 and 17, got {week!r}")
+    directory = Path(cache_dir) if cache_dir is not None else data_dir()
+    archive = directory / "geant-traffic-matrices.tar.bz2"
+    if not archive.exists():
+        logger.info("downloading the GEANT matrices to %s", archive)
+        _fetch(url, archive, _GEANT_SHA256)
+    matrices = _parse_geant(archive, sorted(set(requested)))
+    parts = []
+    for week in requested:
+        if not matrices[week]:
+            raise TMgenException(f"the GEANT archive has no matrices for week {week}")
+        parts.extend(matrices[week])
+    return TrafficMatrix(numpy.stack(parts, axis=2))

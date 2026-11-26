@@ -62,7 +62,8 @@ The pre-commit hooks cover everything above except `pytest`. Notes:
   annotate such results explicitly instead of relying on `type: ignore`.
 - Tests and doctests run in a temporary directory (`conftest.py`), so they
   can write files freely.
-- One test downloads a real Abilene week (7 MB) from the dataset's host; it is
+- Two tests download a real Abilene week (7 MB) and the GEANT archive (18 MB)
+  from the datasets' hosts; they are
   skipped unless `TMGEN_NETWORK_TESTS=1`.
 - A `package` CI job builds the sdist and wheel and imports the installed
   wheel, so packaging mistakes show up before a release.

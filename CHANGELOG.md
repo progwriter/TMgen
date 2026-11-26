@@ -16,6 +16,7 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 - `ncim_tm`: the paper's non-stationary conditionally independent model (eqs. 14 and 15), with optional per-node ingress and egress traffic and truncated-normal variance control.
 - `tmgen.metrics`: compare a synthetic series with a real one by marginal (`ks_distance`, `wasserstein_distance`), spatial (`singular_spectrum`, `gravity_error`, `heavy_hitter_share`, `spatial_comparison`) and temporal (`autocorrelation`, `temporal_comparison`) measures.
 - `tmgen.datasets.load_abilene`: download (once, checksum verified, cached) and load the real Abilene traffic matrices, 24 weeks of 12 x 12 matrices every 5 minutes.
+- `tmgen.datasets.load_geant`: the same for the real GEANT traffic matrices (Uhlig et al., 2005), 17 weeks of 23 x 23 matrices every 15 minutes. A dataset can be saved with `TrafficMatrix.save` for use elsewhere.
 - `shot_noise_tm`: a flow-level series from a Poisson shot-noise process per node pair, with given mean rates and tunable burstiness (Barakat et al., 2003).
 - `elephants_and_mice_tm` and `fluctuating_tm`: mean rates with lognormal large flows and gamma small flows, and Gaussian fluctuations around them whose size follows a power law of the mean (Nucci et al., 2005).
 - `tmgen.lowrank.LowRankModel`: learn the main patterns of a measured series of matrices (PCA with an autoregressive weight per component) and sample new series.

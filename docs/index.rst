@@ -34,7 +34,7 @@ Where to go next
    The models, when to use each, and how to combine them.
 
 :doc:`lowrank`, :doc:`datasets`, :doc:`metrics`
-   Learn a model from measured matrices, load real Abilene traffic, and compare
+   Learn a model from measured matrices, load real Abilene and GEANT traffic, and compare
    synthetic with real series.
 
 :doc:`io`

@@ -49,9 +49,10 @@ entropy model with arbitrary constraints is not exposed yet.
 
 ## Checking against real traffic
 
-`tmgen.datasets.load_abilene` downloads the public
-[Abilene](https://www.cs.utexas.edu/~yzhang/research/AbileneTM/) matrices
-(Yin Zhang, 2004), and `tmgen.metrics` measures how close a generated series is
+`tmgen.datasets.load_abilene` and `load_geant` download the public
+[Abilene](https://www.cs.utexas.edu/~yzhang/research/AbileneTM/) (Yin Zhang,
+2004) and [GEANT](https://totem.info.ucl.ac.be/dataset.html) (Uhlig et al.,
+2005) matrices, and `tmgen.metrics` measures how close a generated series is
 to a real one: the distribution of entries, how traffic spreads over node pairs,
 and how it changes over time.
 
