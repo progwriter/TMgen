@@ -27,6 +27,18 @@ def _entries(tm: TrafficMatrix) -> NDArray[numpy.float64]:
     return values
 
 
+def _cdf_gaps(
+    a: TrafficMatrix, b: TrafficMatrix, grid: NDArray[numpy.float64]
+) -> NDArray[numpy.float64]:
+    """The absolute gap between the empirical CDFs of two series at *grid*."""
+    x, y = _entries(a), _entries(b)
+    gap: NDArray[numpy.float64] = numpy.abs(
+        numpy.searchsorted(x, grid, side="right") / x.size
+        - numpy.searchsorted(y, grid, side="right") / y.size
+    )
+    return gap
+
+
 def ks_distance(a: TrafficMatrix, b: TrafficMatrix) -> float:
     """
     The Kolmogorov-Smirnov distance between the entry values of two series:
@@ -35,13 +47,8 @@ def ks_distance(a: TrafficMatrix, b: TrafficMatrix) -> float:
 
     The series may have different numbers of nodes and epochs.
     """
-    x, y = _entries(a), _entries(b)
-    grid = numpy.concatenate([x, y])
-    gap = numpy.abs(
-        numpy.searchsorted(x, grid, side="right") / x.size
-        - numpy.searchsorted(y, grid, side="right") / y.size
-    )
-    return float(gap.max())
+    grid = numpy.concatenate([_entries(a), _entries(b)])
+    return float(_cdf_gaps(a, b, grid).max())
 
 
 def wasserstein_distance(a: TrafficMatrix, b: TrafficMatrix) -> float:
@@ -53,13 +60,8 @@ def wasserstein_distance(a: TrafficMatrix, b: TrafficMatrix) -> float:
 
     The series may have different numbers of nodes and epochs.
     """
-    x, y = _entries(a), _entries(b)
-    grid = numpy.sort(numpy.concatenate([x, y]))
-    gap = numpy.abs(
-        numpy.searchsorted(x, grid[:-1], side="right") / x.size
-        - numpy.searchsorted(y, grid[:-1], side="right") / y.size
-    )
-    return float((gap * numpy.diff(grid)).sum())
+    grid = numpy.sort(numpy.concatenate([_entries(a), _entries(b)]))
+    return float((_cdf_gaps(a, b, grid[:-1]) * numpy.diff(grid)).sum())
 
 
 def singular_spectrum(

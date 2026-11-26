@@ -687,11 +687,7 @@ def uniform_tm(
     if low > high:
         raise TMgenException(f"low ({low:g}) must not exceed high ({high:g})")
     r = resolve_rng(rng).random((num_nodes, num_nodes, num_epochs))
-    return TrafficMatrix._from_owned(
-        numpy.reshape(low + (high - low) * r, (num_nodes, num_nodes, num_epochs)).clip(
-            min=0
-        )
-    )
+    return TrafficMatrix._from_owned(low + (high - low) * r)
 
 
 @renamed_arguments(mean_traffic="mean_entry")
@@ -712,9 +708,9 @@ def exp_tm(
     num_epochs = count(num_epochs, "num_epochs")
     mean_entry = number(mean_entry, "mean_entry")
     return TrafficMatrix._from_owned(
-        resolve_rng(rng)
-        .exponential(mean_entry, size=(num_nodes, num_nodes, num_epochs))
-        .clip(min=0)
+        resolve_rng(rng).exponential(
+            mean_entry, size=(num_nodes, num_nodes, num_epochs)
+        )
     )
 
 
@@ -786,9 +782,9 @@ def lognormal_tm(
     mu = number(mu, "mu", minimum=None)
     sigma = number(sigma, "sigma")
     return TrafficMatrix._from_owned(
-        resolve_rng(rng)
-        .lognormal(mean=mu, sigma=sigma, size=(num_nodes, num_nodes, num_epochs))
-        .clip(min=0)
+        resolve_rng(rng).lognormal(
+            mean=mu, sigma=sigma, size=(num_nodes, num_nodes, num_epochs)
+        )
     )
 
 
@@ -1003,11 +999,9 @@ def shot_noise_tm(
     )
     width = num_epochs + 1
     split = first != last
-    index = {
-        "first": pair * width + first,
-        "last": pair * width + last,
-        "fill": pair[split] * width,
-    }
+    first_cell = pair * width + first
+    last_cell = pair * width + last
+    fill_row = pair[split] * width
     first_amount = numpy.where(
         split,
         (first + 1) * epoch_length - clipped_start,
@@ -1015,11 +1009,11 @@ def shot_noise_tm(
     )
     last_amount = clipped_end - last * epoch_length
     size_out = rates.size * width
-    volume = numpy.bincount(index["first"], first_amount, size_out)
-    volume += numpy.bincount(index["last"][split], last_amount[split], size_out)
+    volume = numpy.bincount(first_cell, first_amount, size_out)
+    volume += numpy.bincount(last_cell[split], last_amount[split], size_out)
     whole = numpy.full(int(split.sum()), epoch_length)
-    fill = numpy.bincount(index["fill"] + first[split] + 1, whole, size_out)
-    fill -= numpy.bincount(index["fill"] + last[split], whole, size_out)
+    fill = numpy.bincount(fill_row + first[split] + 1, whole, size_out)
+    fill -= numpy.bincount(fill_row + last[split], whole, size_out)
     covered = numpy.cumsum(fill.reshape(rates.size, width), axis=1).ravel()
     per_epoch = (volume + covered).reshape(rates.size, width)[:, :num_epochs]
     rates_over_time = (
@@ -1046,7 +1040,7 @@ def exact_tm(num_nodes: int, value: float, num_epochs: int = 1) -> TrafficMatrix
     num_epochs = count(num_epochs, "num_epochs")
     value = number(value, "value")
     return TrafficMatrix._from_owned(
-        numpy.ones((num_nodes, num_nodes, num_epochs)) * value
+        numpy.full((num_nodes, num_nodes, num_epochs), value)
     )
 
 
