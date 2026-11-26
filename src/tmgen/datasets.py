@@ -200,15 +200,9 @@ def load_abilene(
     directory = Path(cache_dir) if cache_dir is not None else data_dir()
     parts = []
     for week in requested:
-        parsed = directory / f"abilene-X{week:02d}.npy"
-        if parsed.exists():
-            parts.append(numpy.load(parsed, allow_pickle=False))
-            continue
         raw = directory / f"abilene-X{week:02d}.gz"
         if not raw.exists():
             logger.info("downloading Abilene week %d to %s", week, raw)
             _fetch(f"{base_url}/X{week:02d}.gz", raw, _ABILENE_SHA256[week])
-        rates = _parse_abilene(raw)
-        numpy.save(parsed, rates)
-        parts.append(rates)
+        parts.append(_parse_abilene(raw))
     return TrafficMatrix(numpy.concatenate(parts, axis=2))

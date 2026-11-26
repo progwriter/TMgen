@@ -96,15 +96,13 @@ def test_fetch_reports_a_missing_file(tmp_path: Path) -> None:
 
 
 def test_cached_weeks_are_joined_in_the_order_requested(tmp_path: Path) -> None:
-    for week, level in ((3, 3.0), (1, 1.0)):
-        numpy.save(
-            tmp_path / f"abilene-X{week:02d}.npy", numpy.full((12, 12, 4), level)
-        )
-    tm = load_abilene([3, 1], cache_dir=tmp_path)
-    assert tm.shape == (12, 12, 8)
-    assert (tm.matrix[:, :, :4] == 3.0).all()
-    assert (tm.matrix[:, :, 4:] == 1.0).all()
-    assert load_abilene(3, cache_dir=tmp_path).shape == (12, 12, 4)
+    _write_week(tmp_path / "abilene-X03.gz", epochs=2)
+    _write_week(tmp_path / "abilene-X01.gz", epochs=3)
+    offline = (tmp_path / "none").as_uri()
+    tm = load_abilene([3, 1], cache_dir=tmp_path, base_url=offline)
+    assert tm.shape == (12, 12, 5)
+    expected = (143 + numpy.array([0, 1000, 0, 1000, 2000])) * 100 / 300
+    numpy.testing.assert_allclose(tm.matrix[11, 11], expected)
 
 
 @pytest.mark.parametrize("weeks", [[], 0, 25, [1, 99]])
