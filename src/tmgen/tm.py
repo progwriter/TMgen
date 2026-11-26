@@ -9,6 +9,7 @@ import numpy
 from numpy.typing import ArrayLike, DTypeLike, NDArray
 
 from tmgen._compat import renamed_arguments
+from tmgen._validation import series
 from tmgen.exceptions import TMgenException
 
 _Path = str | os.PathLike[str]
@@ -338,14 +339,7 @@ class TrafficMatrix:
                 f"Only a single-epoch matrix can be modulated, got {self.num_epochs} "
                 "epochs"
             )
-        try:
-            values = numpy.asarray(profile, dtype=numpy.float64)
-        except (TypeError, ValueError):
-            raise TMgenException("profile must be an array of numbers") from None
-        if values.ndim != 1 or values.size == 0:
-            raise TMgenException("profile must be a non-empty 1-d array")
-        if not numpy.isfinite(values).all() or (values < 0).any():
-            raise TMgenException("profile values must be finite and non-negative")
+        values = series(profile, "profile")
         return TrafficMatrix._from_owned(self.matrix * values)
 
     def zero_diagonal(self) -> "TrafficMatrix":

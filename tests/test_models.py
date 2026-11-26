@@ -823,3 +823,20 @@ def test_shot_noise_is_stationary_from_the_first_epoch() -> None:
     tm = shot_noise_tm(means, 6, epoch_length=2.0, rng=0, **_SHOT)
     per_epoch = tm.matrix.mean(axis=(0, 1))
     assert per_epoch[0] == pytest.approx(per_epoch[-1], rel=0.1)
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda: ncim_tm(["a"], num_nodes=2),
+        lambda: modulated_gravity_tm(2, 4, 1.0, profile=["a"] * 4),
+        lambda: gravity_tm(["a", "b"], 1.0),
+        lambda: time_zone_profiles(["a", "b"], [0]),
+        lambda: TrafficMatrix(numpy.ones((2, 2, 1))).modulate(["a"]),
+    ],
+)
+def test_text_in_an_array_argument_raises_tmgen_exception(
+    call: Callable[[], Any],
+) -> None:
+    with pytest.raises(TMgenException, match="array of numbers"):
+        call()

@@ -17,6 +17,7 @@ for a real and a synthetic series.
 import numpy
 from numpy.typing import NDArray
 
+from tmgen._validation import count, number
 from tmgen.exceptions import TMgenException
 from tmgen.tm import TrafficMatrix
 
@@ -109,8 +110,7 @@ def heavy_hitter_share(tm: TrafficMatrix, fraction: float = 0.1) -> float:
 
     :param fraction: the fraction of node pairs, in ``(0, 1]``
     """
-    if not 0 < fraction <= 1:
-        raise TMgenException(f"fraction must be in (0, 1], got {fraction!r}")
+    fraction = number(fraction, "fraction", positive=True, maximum=1)
     pairs = numpy.sort(tm.matrix.mean(axis=2), axis=None)[::-1]
     total = pairs.sum()
     if total == 0:
@@ -129,8 +129,7 @@ def autocorrelation(tm: TrafficMatrix, max_lag: int) -> NDArray[numpy.float64]:
     :return: an array of ``max_lag + 1`` values for lags 0 to *max_lag*; the
         first is 1. All zeros except the first if no entry varies
     """
-    if not isinstance(max_lag, int) or max_lag < 1:
-        raise TMgenException(f"max_lag must be a positive integer, got {max_lag!r}")
+    max_lag = count(max_lag, "max_lag")
     if tm.num_epochs <= max_lag:
         raise TMgenException(
             f"max_lag must be below the number of epochs ({tm.num_epochs})"

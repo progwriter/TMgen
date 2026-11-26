@@ -187,3 +187,9 @@ def test_temporal_variability_is_the_gap_between_coefficients_of_variation() -> 
     gap = temporal_comparison(flat, cycle)["variability"]
     assert gap == pytest.approx(totals.std() / totals.mean())
     assert gap > 0
+
+
+def test_numpy_integers_are_accepted_as_lags() -> None:
+    tm = exp_tm(3, 1.0, num_epochs=10, rng=0)
+    lags: Any = numpy.int64(3)
+    assert autocorrelation(tm, lags).shape == (4,)

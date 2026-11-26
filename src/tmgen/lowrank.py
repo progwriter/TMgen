@@ -16,8 +16,9 @@ from dataclasses import dataclass
 import numpy
 from numpy.typing import NDArray
 
+from tmgen._validation import count, number, resolve_rng
 from tmgen.exceptions import TMgenException
-from tmgen.models import RngLike, _count, _number, _resolve_rng
+from tmgen.models import RngLike
 from tmgen.tm import TrafficMatrix
 
 _MAX_AUTOCORRELATION = 0.99
@@ -87,12 +88,12 @@ class LowRankModel:
             )
         explained = numpy.cumsum(variance) / total
         if rank is None:
-            target = _number(explained_variance, "explained_variance")
-            if not 0 < target <= 1:
-                raise TMgenException("explained_variance must be in (0, 1]")
+            target = number(
+                explained_variance, "explained_variance", positive=True, maximum=1
+            )
             rank = int(numpy.searchsorted(explained, target - 1e-12)) + 1
         else:
-            rank = _count(rank, "rank")
+            rank = count(rank, "rank")
             if rank > singular.size:
                 raise TMgenException(
                     f"rank can be at most {singular.size} for {tm.num_epochs} epochs"
@@ -127,8 +128,8 @@ class LowRankModel:
             :py:data:`~tmgen.models.RngLike`
         :return: a new :py:class:`~tmgen.TrafficMatrix`
         """
-        num_epochs = _count(num_epochs, "num_epochs")
-        gen = _resolve_rng(rng)
+        num_epochs = count(num_epochs, "num_epochs")
+        gen = resolve_rng(rng)
         noise = gen.standard_normal((num_epochs, self.rank))
         innovation = numpy.sqrt(1 - self.autocorrelation**2)
         weights = numpy.empty_like(noise)

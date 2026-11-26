@@ -24,6 +24,10 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 - `time_zone_profiles`: delayed copies of a cycle, one per node, to model nodes in different time zones.
 - `modulated_gravity_tm(profile=...)` takes the mean total traffic of every epoch, for example from `fourier_profile`, instead of the daily cycle.
 
+### Fixed
+
+- Arrays that contain text now raise `TMgenException` (not a bare NumPy error) in `ncim_tm`, `modulated_gravity_tm`, `gravity_tm`, `time_zone_profiles` and `TrafficMatrix.modulate`, and `metrics.autocorrelation` accepts NumPy integers as the lag.
+
 ## [0.2.0] - 2026-11-23
 
 ### Added

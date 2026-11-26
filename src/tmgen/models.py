@@ -15,6 +15,7 @@ import numpy
 from numpy.typing import ArrayLike, NDArray
 
 from tmgen._compat import renamed_arguments
+from tmgen._validation import count, nonnegative, number, resolve_rng, series
 from tmgen.exceptions import TMgenException
 from tmgen.tm import TrafficMatrix
 
@@ -24,42 +25,6 @@ RngLike = numpy.random.Generator | int | None
 ``None`` draws from NumPy's global state (so ``numpy.random.seed`` keeps
 working); an ``int`` seeds a fresh generator; a ``Generator`` is used as is.
 """
-
-
-def _count(value: float, name: str) -> int:
-    """A positive whole number, such as a number of nodes or epochs."""
-    try:
-        count = int(value)
-    except (TypeError, ValueError, OverflowError):
-        raise TMgenException(
-            f"{name} must be a positive integer, got {value!r}"
-        ) from None
-    if count != value or count < 1:
-        raise TMgenException(f"{name} must be a positive integer, got {value!r}")
-    return count
-
-
-def _number(value: float, name: str, *, minimum: float | None = 0) -> float:
-    """A finite number, at least *minimum* (any if None)."""
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        raise TMgenException(f"{name} must be a number, got {value!r}") from None
-    if not numpy.isfinite(number) or (minimum is not None and number < minimum):
-        bound = "" if minimum is None else f" and at least {minimum:g}"
-        raise TMgenException(f"{name} must be finite{bound}, got {value!r}")
-    return number
-
-
-def _resolve_rng(rng: RngLike) -> Any:
-    """
-    A source of random numbers with the methods of ``numpy.random.Generator``
-    that the models use. ``None`` gives the ``numpy.random`` module itself, whose
-    functions draw from NumPy's global state (and so follow ``numpy.random.seed``).
-    """
-    if rng is None:
-        return numpy.random
-    return numpy.random.default_rng(rng)
 
 
 def _truncated_normal(
@@ -88,9 +53,9 @@ def _truncated_normal(
     todo = numpy.ones(mean.shape, dtype=bool)
     while todo.any():
         a = lower[todo]
-        count = a.size
-        z = numpy.empty(count)
-        accept = numpy.empty(count, dtype=bool)
+        size = a.size
+        z = numpy.empty(size)
+        accept = numpy.empty(size, dtype=bool)
         body = a <= 0
         if body.any():
             z[body] = gen.standard_normal(int(body.sum()))
@@ -108,21 +73,11 @@ def _truncated_normal(
     return numpy.clip(mean + std * out, 0, None).reshape(shape)
 
 
-def _series(values: ArrayLike, name: str) -> NDArray[numpy.float64]:
-    """A non-empty one-dimensional array of finite non-negative numbers."""
-    array = numpy.asarray(values, dtype=numpy.float64)
-    if array.ndim != 1 or array.size == 0:
-        raise TMgenException(f"{name} must be a non-empty one-dimensional array")
-    if not numpy.isfinite(array).all() or (array < 0).any():
-        raise TMgenException(f"{name} must be finite and non-negative")
-    return array
-
-
 def _node_traffic(
     values: ArrayLike, num_epochs: int, name: str
 ) -> NDArray[numpy.float64]:
     """Per-node traffic as (num_nodes, num_epochs); a 1-D input is constant in time."""
-    array = numpy.asarray(values, dtype=numpy.float64)
+    array = nonnegative(values, name)
     if array.ndim == 1:
         array = numpy.repeat(array[:, None], num_epochs, axis=1)
     if array.ndim != 2 or array.shape[0] == 0 or array.shape[1] != num_epochs:
@@ -130,8 +85,6 @@ def _node_traffic(
             f"{name} must have shape (num_nodes, {num_epochs}) or (num_nodes,), "
             f"got {numpy.shape(values)}"
         )
-    if not numpy.isfinite(array).all() or (array < 0).any():
-        raise TMgenException(f"{name} must be finite and non-negative")
     return array
 
 
@@ -166,10 +119,10 @@ def diurnal_profile(
         24 epochs, i.e. hourly epochs over a day
     :return: an array with one value per epoch
     """
-    num_epochs = _count(num_epochs, "num_epochs")
-    mean = _number(mean, "mean")
-    peak_to_mean = _number(peak_to_mean, "peak_to_mean", minimum=1)
-    diurnal_freq = _number(diurnal_freq, "diurnal_freq", minimum=None)
+    num_epochs = count(num_epochs, "num_epochs")
+    mean = number(mean, "mean")
+    peak_to_mean = number(peak_to_mean, "peak_to_mean", minimum=1)
+    diurnal_freq = number(diurnal_freq, "diurnal_freq", minimum=None)
     if trough_to_mean is None:
         if peak_to_mean > 2:
             raise TMgenException(
@@ -177,7 +130,7 @@ def diurnal_profile(
                 "would be negative); pass trough_to_mean for a different shape"
             )
         trough_to_mean = 2 - peak_to_mean
-    trough_to_mean = _number(trough_to_mean, "trough_to_mean")
+    trough_to_mean = number(trough_to_mean, "trough_to_mean")
     if trough_to_mean > 1:
         raise TMgenException(
             f"trough_to_mean must be at most 1, got {trough_to_mean:g}"
@@ -209,14 +162,14 @@ def fourier_profile(
     :return: an array with one value per epoch
     :raises TMgenException: if the profile would be negative in some epoch
     """
-    num_epochs = _count(num_epochs, "num_epochs")
-    mean = _number(mean, "mean")
+    num_epochs = count(num_epochs, "num_epochs")
+    mean = number(mean, "mean")
     epochs = numpy.arange(num_epochs)
     profile: NDArray[numpy.float64] = numpy.full(num_epochs, mean)
     for frequency, amplitude, phase in harmonics:
-        frequency = _number(frequency, "frequency", minimum=None)
-        amplitude = _number(amplitude, "amplitude", minimum=None)
-        phase = _number(phase, "phase", minimum=None)
+        frequency = number(frequency, "frequency", minimum=None)
+        amplitude = number(amplitude, "amplitude", minimum=None)
+        phase = number(phase, "phase", minimum=None)
         profile = profile + amplitude * numpy.cos(
             2 * numpy.pi * frequency * epochs + phase
         )
@@ -247,9 +200,7 @@ def time_zone_profiles(
     :return: an array of shape ``(len(shifts), len(profile))``; row ``i`` is
         *profile* delayed by ``shifts[i]``
     """
-    values = numpy.asarray(profile, dtype=numpy.float64)
-    if values.ndim != 1 or values.size == 0:
-        raise TMgenException("profile must be a non-empty one-dimensional array")
+    values = series(profile, "profile")
     if len(shifts) == 0:
         raise TMgenException("shifts must not be empty")
     for shift in shifts:
@@ -299,10 +250,10 @@ def ncim_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: a new :py:class:`~TrafficMatrix`
     """
-    total = _series(total_traffic, "total_traffic")
+    total = series(total_traffic, "total_traffic")
     num_epochs = total.size
-    spatial_variance = _number(spatial_variance, "spatial_variance")
-    gen = _resolve_rng(rng)
+    spatial_variance = number(spatial_variance, "spatial_variance")
+    gen = resolve_rng(rng)
 
     if ingress_traffic is None and egress_traffic is None:
         if num_nodes is None:
@@ -313,7 +264,7 @@ def ncim_tm(
             raise TMgenException(
                 "spatial_variance needs ingress_traffic and egress_traffic"
             )
-        num_nodes = _count(num_nodes, "num_nodes")
+        num_nodes = count(num_nodes, "num_nodes")
         scale = total / num_nodes**2
         entries = gen.exponential(1.0, size=(num_nodes, num_nodes, num_epochs))
         return TrafficMatrix._from_owned(entries * scale)
@@ -323,7 +274,7 @@ def ncim_tm(
     ingress = _node_traffic(ingress_traffic, num_epochs, "ingress_traffic")
     egress = _node_traffic(egress_traffic, num_epochs, "egress_traffic")
     if num_nodes is not None:
-        num_nodes = _count(num_nodes, "num_nodes")
+        num_nodes = count(num_nodes, "num_nodes")
         if num_nodes != ingress.shape[0]:
             raise TMgenException(
                 f"num_nodes is {num_nodes} but ingress_traffic has "
@@ -383,7 +334,7 @@ def traffic_class_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: a new :py:class:`~TrafficMatrix`
     """
-    total = _series(total_traffic, "total_traffic")
+    total = series(total_traffic, "total_traffic")
     num_epochs = total.size
     labels = numpy.asarray(node_classes)
     if (
@@ -413,7 +364,7 @@ def traffic_class_tm(
         raise TMgenException(
             "class_fractions must be non-negative and sum to 1 in every epoch"
         )
-    gen = _resolve_rng(rng)
+    gen = resolve_rng(rng)
 
     def weights() -> NDArray[numpy.float64]:
         raw = gen.exponential(1.0, size=(labels.size, num_epochs))
@@ -473,28 +424,24 @@ def datacenter_tm(
     :return: a new :py:class:`~TrafficMatrix`
     :raises TMgenException: if the requested properties cannot hold together
     """
-    num_nodes = _count(num_nodes, "num_nodes")
+    num_nodes = count(num_nodes, "num_nodes")
     if num_nodes < 2:
         raise TMgenException("num_nodes must be at least 2")
-    total_traffic = _number(total_traffic, "total_traffic")
-    hot_load_fraction = _number(hot_load_fraction, "hot_load_fraction")
-    if hot_load_fraction > 1:
-        raise TMgenException("hot_load_fraction must be at most 1")
-    num_racks = _count(num_racks, "num_racks")
+    total_traffic = number(total_traffic, "total_traffic")
+    hot_load_fraction = number(hot_load_fraction, "hot_load_fraction", maximum=1)
+    num_racks = count(num_racks, "num_racks")
     if num_racks > num_nodes:
         raise TMgenException("num_racks must not exceed num_nodes")
     if (inter_rack_fraction is None) != (num_racks == 1):
         raise TMgenException(
             "inter_rack_fraction is required with, and only with, more than one rack"
         )
-    gen = _resolve_rng(rng)
+    gen = resolve_rng(rng)
 
     if hot_nodes is None:
-        hot_node_fraction = _number(hot_node_fraction, "hot_node_fraction")
-        if hot_node_fraction > 1:
-            raise TMgenException("hot_node_fraction must be at most 1")
-        count = max(1, round(hot_node_fraction * num_nodes))
-        hot = numpy.asarray(gen.permutation(num_nodes)[:count])
+        hot_node_fraction = number(hot_node_fraction, "hot_node_fraction", maximum=1)
+        num_hot = max(1, round(hot_node_fraction * num_nodes))
+        hot = numpy.asarray(gen.permutation(num_nodes)[:num_hot])
     else:
         hot = numpy.unique(numpy.asarray(hot_nodes, dtype=int))
         if hot.size == 0 or hot.min() < 0 or hot.max() >= num_nodes:
@@ -523,9 +470,7 @@ def datacenter_tm(
     within = off_diagonal & ~crossing
     inter = 0.0
     if inter_rack_fraction is not None:
-        inter = _number(inter_rack_fraction, "inter_rack_fraction")
-        if inter > 1:
-            raise TMgenException("inter_rack_fraction must be at most 1")
+        inter = number(inter_rack_fraction, "inter_rack_fraction", maximum=1)
         if not within.any() and inter < 1:
             raise TMgenException("racks of one node have no traffic inside them")
     for _ in range(20000):
@@ -609,29 +554,25 @@ def modulated_gravity_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: a new :py:class:`~TrafficMatrix`
     """
-    num_nodes = _count(num_nodes, "num_nodes")
-    num_epochs = _count(num_epochs, "num_epochs")
-    total_traffic = _number(total_traffic, "total_traffic")
-    if total_traffic == 0 and profile is None:
-        raise TMgenException("total_traffic must be positive")
-    diurnal_freq = _number(diurnal_freq, "diurnal_freq", minimum=None)
-    spatial_variance = _number(spatial_variance, "spatial_variance")
-    temporal_variance = _number(temporal_variance, "temporal_variance")
-    gen = _resolve_rng(rng)
+    num_nodes = count(num_nodes, "num_nodes")
+    num_epochs = count(num_epochs, "num_epochs")
+    total_traffic = number(total_traffic, "total_traffic", positive=profile is None)
+    diurnal_freq = number(diurnal_freq, "diurnal_freq", minimum=None)
+    spatial_variance = number(spatial_variance, "spatial_variance")
+    temporal_variance = number(temporal_variance, "temporal_variance")
+    gen = resolve_rng(rng)
 
     if profile is None:
         total = diurnal_profile(
             num_epochs, total_traffic, peak_to_mean, trough_to_mean, diurnal_freq
         )
     else:
-        total = numpy.asarray(profile, dtype=numpy.float64)
+        total = nonnegative(profile, "profile")
         if total.shape != (num_epochs,):
             raise TMgenException(
                 f"profile needs one value per epoch ({num_epochs}), got shape "
                 f"{total.shape}"
             )
-        if not numpy.isfinite(total).all() or (total < 0).any():
-            raise TMgenException("profile must be finite and non-negative")
     mean_total = float(numpy.mean(total))
     if mean_total == 0:
         raise TMgenException("profile must have a positive mean")
@@ -686,9 +627,9 @@ def random_gravity_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: a new :py:class:`~TrafficMatrix`
     """
-    num_nodes = _count(num_nodes, "num_nodes")
-    total_traffic = _number(total_traffic, "total_traffic")
-    gen = _resolve_rng(rng)
+    num_nodes = count(num_nodes, "num_nodes")
+    total_traffic = number(total_traffic, "total_traffic")
+    gen = resolve_rng(rng)
     ingress = gen.exponential(1.0, size=num_nodes)
     egress = ingress if symmetric else gen.exponential(1.0, size=num_nodes)
     scale = ingress.sum() * egress.sum() if normalize else num_nodes**2
@@ -710,15 +651,8 @@ def gravity_tm(populations: ArrayLike, total_traffic: float) -> TrafficMatrix:
         (divided among all ingress-egress pairs)
     :return: a new :py:class:`~TrafficMatrix`
     """
-    total_traffic = _number(total_traffic, "total_traffic")
-    try:
-        populations = numpy.asarray(populations, dtype=numpy.float64)
-    except (TypeError, ValueError):
-        raise TMgenException("populations must be numeric") from None
-    if populations.ndim != 1 or populations.size == 0:
-        raise TMgenException("Expected populations to be a non-empty 1-d array")
-    if not numpy.isfinite(populations).all() or (populations < 0).any():
-        raise TMgenException("populations must be finite and non-negative")
+    total_traffic = number(total_traffic, "total_traffic")
+    populations = series(populations, "populations")
     if populations.sum() == 0:
         raise TMgenException("populations must not all be zero")
     num_nodes = populations.size
@@ -746,13 +680,13 @@ def uniform_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
     """
-    num_nodes = _count(num_nodes, "num_nodes")
-    num_epochs = _count(num_epochs, "num_epochs")
-    low = _number(low, "low")
-    high = _number(high, "high")
+    num_nodes = count(num_nodes, "num_nodes")
+    num_epochs = count(num_epochs, "num_epochs")
+    low = number(low, "low")
+    high = number(high, "high")
     if low > high:
         raise TMgenException(f"low ({low:g}) must not exceed high ({high:g})")
-    r = _resolve_rng(rng).random((num_nodes, num_nodes, num_epochs))
+    r = resolve_rng(rng).random((num_nodes, num_nodes, num_epochs))
     return TrafficMatrix._from_owned(
         numpy.reshape(low + (high - low) * r, (num_nodes, num_nodes, num_epochs)).clip(
             min=0
@@ -774,11 +708,11 @@ def exp_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
     """
-    num_nodes = _count(num_nodes, "num_nodes")
-    num_epochs = _count(num_epochs, "num_epochs")
-    mean_entry = _number(mean_entry, "mean_entry")
+    num_nodes = count(num_nodes, "num_nodes")
+    num_epochs = count(num_epochs, "num_epochs")
+    mean_entry = number(mean_entry, "mean_entry")
     return TrafficMatrix._from_owned(
-        _resolve_rng(rng)
+        resolve_rng(rng)
         .exponential(mean_entry, size=(num_nodes, num_nodes, num_epochs))
         .clip(min=0)
     )
@@ -809,9 +743,9 @@ def spike_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
     """
-    num_nodes = _count(num_nodes, "num_nodes")
-    num_epochs = _count(num_epochs, "num_epochs")
-    mean_spike = _number(mean_spike, "mean_spike")
+    num_nodes = count(num_nodes, "num_nodes")
+    num_epochs = count(num_epochs, "num_epochs")
+    mean_spike = number(mean_spike, "mean_spike")
     size = num_nodes * num_nodes * num_epochs
     if num_spikes != int(num_spikes) or not 0 <= num_spikes <= size:
         raise TMgenException(
@@ -820,7 +754,7 @@ def spike_tm(
             f"got {num_spikes!r}"
         )
     num_spikes = int(num_spikes)
-    gen = _resolve_rng(rng)
+    gen = resolve_rng(rng)
     tm = numpy.zeros(size)
     support = gen.choice(size, size=num_spikes, replace=False)
     tm[support] = gen.exponential(mean_spike, size=num_spikes)
@@ -847,12 +781,12 @@ def lognormal_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: TrafficMatrix object
     """
-    num_nodes = _count(num_nodes, "num_nodes")
-    num_epochs = _count(num_epochs, "num_epochs")
-    mu = _number(mu, "mu", minimum=None)
-    sigma = _number(sigma, "sigma")
+    num_nodes = count(num_nodes, "num_nodes")
+    num_epochs = count(num_epochs, "num_epochs")
+    mu = number(mu, "mu", minimum=None)
+    sigma = number(sigma, "sigma")
     return TrafficMatrix._from_owned(
-        _resolve_rng(rng)
+        resolve_rng(rng)
         .lognormal(mean=mu, sigma=sigma, size=(num_nodes, num_nodes, num_epochs))
         .clip(min=0)
     )
@@ -895,17 +829,13 @@ def elephants_and_mice_tm(
     :param rng: seed or :py:class:`numpy.random.Generator`; see :py:data:`RngLike`
     :return: a new :py:class:`~TrafficMatrix` with one epoch
     """
-    num_nodes = _count(num_nodes, "num_nodes")
-    small_fraction = _number(small_fraction, "small_fraction")
-    if small_fraction > 1:
-        raise TMgenException("small_fraction must be at most 1")
-    large_mu = _number(large_mu, "large_mu", minimum=None)
-    large_sigma = _number(large_sigma, "large_sigma")
-    small_shape = _number(small_shape, "small_shape")
-    small_scale = _number(small_scale, "small_scale")
-    if small_shape == 0 or small_scale == 0:
-        raise TMgenException("small_shape and small_scale must be positive")
-    gen = _resolve_rng(rng)
+    num_nodes = count(num_nodes, "num_nodes")
+    small_fraction = number(small_fraction, "small_fraction", maximum=1)
+    large_mu = number(large_mu, "large_mu", minimum=None)
+    large_sigma = number(large_sigma, "large_sigma")
+    small_shape = number(small_shape, "small_shape", positive=True)
+    small_scale = number(small_scale, "small_scale", positive=True)
+    gen = resolve_rng(rng)
     shape = (num_nodes, num_nodes)
     small = gen.random(shape) < small_fraction
     large_rates = gen.lognormal(mean=large_mu, sigma=large_sigma, size=shape)
@@ -959,15 +889,13 @@ def fluctuating_tm(
     """
     if means.num_epochs != 1:
         raise TMgenException("means must be a matrix with one epoch")
-    num_epochs = _count(num_epochs, "num_epochs")
-    psi = _number(psi, "psi")
-    gamma = _number(gamma, "gamma")
-    unit = _number(unit, "unit")
-    if unit == 0:
-        raise TMgenException("unit must be positive")
+    num_epochs = count(num_epochs, "num_epochs")
+    psi = number(psi, "psi")
+    gamma = number(gamma, "gamma")
+    unit = number(unit, "unit", positive=True)
     mean = means.matrix[:, :, :1]
     std = unit * psi * (mean / unit) ** gamma
-    gen = _resolve_rng(rng)
+    gen = resolve_rng(rng)
     noise = gen.standard_normal((means.num_nodes, means.num_nodes, num_epochs))
     return TrafficMatrix._from_owned(numpy.clip(mean + std * noise, 0, None))
 
@@ -1028,21 +956,17 @@ def shot_noise_tm(
     """
     if means.num_epochs != 1:
         raise TMgenException("means must be a matrix with one epoch")
-    num_epochs = _count(num_epochs, "num_epochs")
-    epoch_length = _number(epoch_length, "epoch_length")
-    mean_flow_size = _number(mean_flow_size, "mean_flow_size")
-    flow_rate = _number(flow_rate, "flow_rate")
-    if epoch_length == 0 or mean_flow_size == 0 or flow_rate == 0:
-        raise TMgenException(
-            "epoch_length, mean_flow_size and flow_rate must be positive"
-        )
-    size_shape = _number(size_shape, "size_shape")
+    num_epochs = count(num_epochs, "num_epochs")
+    epoch_length = number(epoch_length, "epoch_length", positive=True)
+    mean_flow_size = number(mean_flow_size, "mean_flow_size", positive=True)
+    flow_rate = number(flow_rate, "flow_rate", positive=True)
+    size_shape = number(size_shape, "size_shape")
     if size_shape <= 1:
         raise TMgenException("size_shape must be greater than 1 for a finite mean")
     if warmup is None:
         warmup = 20 * mean_flow_size / flow_rate
-    warmup = _number(warmup, "warmup")
-    gen = _resolve_rng(rng)
+    warmup = number(warmup, "warmup")
+    gen = resolve_rng(rng)
 
     num_nodes = means.num_nodes
     rates = means.matrix[:, :, 0].ravel()
@@ -1098,8 +1022,12 @@ def shot_noise_tm(
     fill -= numpy.bincount(index["fill"] + last[split], whole, size_out)
     covered = numpy.cumsum(fill.reshape(rates.size, width), axis=1).ravel()
     per_epoch = (volume + covered).reshape(rates.size, width)[:, :num_epochs]
-    series = numpy.asarray(flow_rate * per_epoch / epoch_length, dtype=numpy.float64)
-    return TrafficMatrix._from_owned(series.reshape(num_nodes, num_nodes, num_epochs))
+    rates_over_time = (
+        numpy.asarray(flow_rate * per_epoch, dtype=numpy.float64) / epoch_length
+    )
+    return TrafficMatrix._from_owned(
+        rates_over_time.reshape(num_nodes, num_nodes, num_epochs)
+    )
 
 
 @renamed_arguments(val="value")
@@ -1114,9 +1042,9 @@ def exact_tm(num_nodes: int, value: float, num_epochs: int = 1) -> TrafficMatrix
     :param num_epochs: number of epochs
     :return: a new TrafficMatrix object
     """
-    num_nodes = _count(num_nodes, "num_nodes")
-    num_epochs = _count(num_epochs, "num_epochs")
-    value = _number(value, "value")
+    num_nodes = count(num_nodes, "num_nodes")
+    num_epochs = count(num_epochs, "num_epochs")
+    value = number(value, "value")
     return TrafficMatrix._from_owned(
         numpy.ones((num_nodes, num_nodes, num_epochs)) * value
     )
