@@ -27,6 +27,7 @@ time, rename that section to the new version and date (see `RELEASING.md`).
 ### Fixed
 
 - Arrays that contain text now raise `TMgenException` (not a bare NumPy error) in `ncim_tm`, `modulated_gravity_tm`, `gravity_tm`, `time_zone_profiles` and `TrafficMatrix.modulate`, and `metrics.autocorrelation` accepts NumPy integers as the lag.
+- Importing `tmgen.inject.ditg_injector` no longer replaces the Ctrl-C handler of your program; `tmditg` installs it when it runs, and logs instead of printing. The documentation now says that `--destinations` takes the JSON text, not a file name.
 
 ## [0.2.0] - 2026-11-23
 

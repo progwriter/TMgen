@@ -22,9 +22,10 @@ Then, on the machine that plays node ``0``:
 .. code-block:: console
 
    tmditg --tm tm.npz --epoch-length 60 --id 0 \
-          --destinations destinations.json --port 9000
+          --destinations '{"1": ["10.0.0.2"], "2": ["10.0.0.3"]}' --port 9000
 
-``--destinations`` is a JSON file that maps node IDs to lists of IP addresses.
+``--destinations`` is a JSON object (given as text, not a file name) that maps
+node IDs to lists of IP addresses, for example ``'{"1": ["10.0.0.2"]}'``.
 ``--scale`` multiplies all entries, which is handy to fit the traffic to the
 capacity of your testbed. Run ``tmditg --help`` for all options.
 

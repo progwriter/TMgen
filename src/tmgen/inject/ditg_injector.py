@@ -6,25 +6,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import signal
 import sys
 import time
+from collections.abc import Sequence
 from math import ceil
 from subprocess import Popen
-from types import FrameType
 
 from tmgen.inject import InjectorBase
 
-injector: DITGinjector | None = None
+logger = logging.getLogger(__name__)
 
-
-def interrupt_handler(sig: int, frame: FrameType | None) -> None:
-    if sig == signal.SIGINT and injector is not None:
-        injector.stop()
-
-
-signal.signal(signal.SIGINT, interrupt_handler)
 SLEEP_GAP = 1  # should be enough to spin up receivers or kill senders
 
 
@@ -117,15 +111,14 @@ class DITGinjector(InjectorBase):
             r.wait()
 
     def stop(self) -> None:
-        print("Stopping the injector")
+        logger.info("Stopping the injector")
         for p in self._send_processes:
             p.terminate()
         if self._receiver_process is not None:
             self._receiver_process.terminate()
 
 
-def main() -> None:
-    global injector
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--tm", help="The traffic matrix filename", required=True)
     parser.add_argument(
@@ -156,7 +149,8 @@ def main() -> None:
     parser.add_argument(
         "--sigport", default=10435, type=int, help="DITG singnalint port"
     )
-    options = parser.parse_args()
+    options = parser.parse_args(argv)
+    logging.basicConfig(level=logging.INFO)
 
     injector = DITGinjector(
         options.tm,
@@ -167,6 +161,7 @@ def main() -> None:
         options.sigport,
         scale_factor=options.scale,
     )
+    signal.signal(signal.SIGINT, lambda sig, frame: injector.stop())
     injector.run()
 
 
